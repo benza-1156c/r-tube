@@ -12,6 +12,13 @@ export const commands = {
 	upsertProfile: (name: string, email: string, avatarUrl: string, cookies: string) => typedError<Model, AppError_Serialize>(__TAURI_INVOKE("upsert_profile", { name, email, avatarUrl, cookies })),
 	setActiveProfile: (id: number) => typedError<Model, AppError_Serialize>(__TAURI_INVOKE("set_active_profile", { id })),
 	deleteProfile: (id: number) => typedError<boolean, AppError_Serialize>(__TAURI_INVOKE("delete_profile", { id })),
+	getHomeFeed: (continuation: string | null) => typedError<HomeFeed_Serialize, AppError_Serialize>(__TAURI_INVOKE("get_home_feed", { continuation })),
+	getSubscriptionsFeed: () => typedError<BrowseFeed_Serialize, AppError_Serialize>(__TAURI_INVOKE("get_subscriptions_feed")),
+	getTrending: () => typedError<TrendingFeed, AppError_Serialize>(__TAURI_INVOKE("get_trending")),
+	search: (query: string, continuation: string | null) => typedError<SearchResults_Serialize, AppError_Serialize>(__TAURI_INVOKE("search", { query, continuation })),
+	getVideoInfo: (videoId: string) => typedError<PlayerResponse_Serialize, AppError_Serialize>(__TAURI_INVOKE("get_video_info", { videoId })),
+	getWatchNext: (videoId: string) => typedError<WatchNextResults_Serialize, AppError_Serialize>(__TAURI_INVOKE("get_watch_next", { videoId })),
+	getAccountInfo: () => typedError<CurrentUserProfile_Serialize, AppError_Serialize>(__TAURI_INVOKE("get_account_info")),
 };
 
 /* Types */
@@ -20,6 +27,64 @@ export type AppError = AppError_Serialize | AppError_Deserialize;
 export type AppError_Deserialize = { type: "Database"; message: string } | { type: "NotFound"; message: string } | { type: "Validation"; message: string } | { type: "Internal"; message: string };
 
 export type AppError_Serialize = { type: "Database"; message: string } | { type: "NotFound"; message: string } | { type: "Validation"; message: string } | { type: "Internal"; message: string };
+
+export type BrowseFeed = BrowseFeed_Serialize | BrowseFeed_Deserialize;
+
+export type BrowseFeed_Deserialize = {
+	browseId: string,
+	videos: VideoItem[],
+	continuationToken?: string | null,
+};
+
+export type BrowseFeed_Serialize = {
+	browseId: string,
+	videos: VideoItem[],
+	continuationToken: string | null,
+};
+
+export type CurrentUserProfile = CurrentUserProfile_Serialize | CurrentUserProfile_Deserialize;
+
+export type CurrentUserProfile_Deserialize = {
+	name: string,
+	email: string,
+	avatar_url: string,
+	handle?: string | null,
+};
+
+export type CurrentUserProfile_Serialize = {
+	name: string,
+	email: string,
+	avatar_url: string,
+	handle: string | null,
+};
+
+export type FilterChip = FilterChip_Serialize | FilterChip_Deserialize;
+
+export type FilterChip_Deserialize = {
+	text: string,
+	params?: string | null,
+	isSelected: boolean,
+};
+
+export type FilterChip_Serialize = {
+	text: string,
+	params: string | null,
+	isSelected: boolean,
+};
+
+export type HomeFeed = HomeFeed_Serialize | HomeFeed_Deserialize;
+
+export type HomeFeed_Deserialize = {
+	filterChips: FilterChip_Deserialize[],
+	videos: VideoItem[],
+	continuationToken?: string | null,
+};
+
+export type HomeFeed_Serialize = {
+	filterChips: FilterChip_Serialize[],
+	videos: VideoItem[],
+	continuationToken: string | null,
+};
 
 export type Model = {
 	id: number,
@@ -30,6 +95,115 @@ export type Model = {
 	cookies: string,
 	is_active: boolean,
 	updated_at: string,
+};
+
+export type PlayerResponse = PlayerResponse_Serialize | PlayerResponse_Deserialize;
+
+export type PlayerResponse_Deserialize = {
+	id: string,
+	title: string,
+	description: string,
+	channelName: string,
+	channelId: string,
+	lengthSeconds: string,
+	viewCount: string,
+	isLive: boolean,
+	thumbnailUrl: string,
+	formats: VideoStreamFormat_Deserialize[],
+	adaptiveFormats: VideoStreamFormat_Deserialize[],
+	hlsManifestUrl?: string | null,
+	dashManifestUrl?: string | null,
+};
+
+export type PlayerResponse_Serialize = {
+	id: string,
+	title: string,
+	description: string,
+	channelName: string,
+	channelId: string,
+	lengthSeconds: string,
+	viewCount: string,
+	isLive: boolean,
+	thumbnailUrl: string,
+	formats: VideoStreamFormat_Serialize[],
+	adaptiveFormats: VideoStreamFormat_Serialize[],
+	hlsManifestUrl: string | null,
+	dashManifestUrl: string | null,
+};
+
+export type SearchResults = SearchResults_Serialize | SearchResults_Deserialize;
+
+export type SearchResults_Deserialize = {
+	query: string,
+	videos: VideoItem[],
+	continuationToken?: string | null,
+};
+
+export type SearchResults_Serialize = {
+	query: string,
+	videos: VideoItem[],
+	continuationToken: string | null,
+};
+
+export type TrendingFeed = {
+	currentTab: string,
+	videos: VideoItem[],
+};
+
+export type VideoItem = {
+	id: string,
+	title: string,
+	thumbnailUrl: string,
+	duration: string,
+	channelName: string,
+	channelAvatarUrl: string,
+	isVerified: boolean,
+	viewCount: string,
+	publishedAt: string,
+};
+
+export type VideoStreamFormat = VideoStreamFormat_Serialize | VideoStreamFormat_Deserialize;
+
+export type VideoStreamFormat_Deserialize = {
+	itag: number,
+	mimeType: string,
+	qualityLabel?: string | null,
+	bitrate: number,
+	url?: string | null,
+	width?: number | null,
+	height?: number | null,
+	isAudio: boolean,
+	isVideo: boolean,
+};
+
+export type VideoStreamFormat_Serialize = {
+	itag: number,
+	mimeType: string,
+	qualityLabel: string | null,
+	bitrate: number,
+	url: string | null,
+	width: number | null,
+	height: number | null,
+	isAudio: boolean,
+	isVideo: boolean,
+};
+
+export type WatchNextResults = WatchNextResults_Serialize | WatchNextResults_Deserialize;
+
+export type WatchNextResults_Deserialize = {
+	currentVideoId: string,
+	currentTitle?: string | null,
+	currentAuthor?: string | null,
+	relatedVideos: VideoItem[],
+	continuationToken?: string | null,
+};
+
+export type WatchNextResults_Serialize = {
+	currentVideoId: string,
+	currentTitle: string | null,
+	currentAuthor: string | null,
+	relatedVideos: VideoItem[],
+	continuationToken: string | null,
 };
 
 /* Tauri Specta runtime */

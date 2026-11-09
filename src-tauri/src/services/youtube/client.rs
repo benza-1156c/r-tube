@@ -357,7 +357,10 @@ impl YoutubeClient {
             }
         }
 
-        let final_name = name.ok_or_else(|| AppError::not_found_item("user account"))?;
+        let final_name = name
+            .or_else(|| email.clone())
+            .or_else(|| handle.clone())
+            .unwrap_or_else(|| "YouTube User".to_string());
 
         Ok(CurrentUserProfile {
             name: final_name,

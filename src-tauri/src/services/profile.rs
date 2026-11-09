@@ -108,7 +108,7 @@ pub async fn set_active_profile(
 
 pub async fn logout(db: &DatabaseConnection) -> Result<(), AppError> {
     profile::Entity::update_many()
-        .col_expr(profile::Column::IsActive, true.into())
+        .col_expr(profile::Column::IsActive, false.into())
         .filter(profile::Column::IsActive.eq(true))
         .exec(db)
         .await

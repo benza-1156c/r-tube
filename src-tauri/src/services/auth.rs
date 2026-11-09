@@ -43,7 +43,6 @@ pub fn open_login_window(app: &AppHandle) -> Result<WebviewWindow, AppError> {
 pub async fn login_yt(app: &AppHandle) -> Result<profile::Model, AppError> {
     let _window = open_login_window(app)?;
     let state = app.state::<AppState>();
-    let yt_url: Url = "https://www.youtube.com".parse().unwrap();
 
     loop {
         sleep(Duration::from_millis(500)).await;
@@ -55,21 +54,21 @@ pub async fn login_yt(app: &AppHandle) -> Result<profile::Model, AppError> {
         if let Ok(url) = window.url() {
             if is_youtube_home(&url) {
                 let _ = window.hide();
-                let Ok(cookies) = window.cookies_for_url(yt_url.clone()) else {
+                let Ok(cookies) = window.cookies() else {
                     continue;
                 };
 
-                let has_login_info = cookies.iter().any(|c| c.name() == "LOGIN_INFO");
-                let has_sapisid = cookies
-                    .iter()
-                    .any(|c| c.name() == "SAPISID" || c.name() == "__Secure-3PAPISID");
+                let has_auth = cookies.iter().any(|c| {
+                    let n = c.name();
+                    n == "LOGIN_INFO" || n == "SAPISID" || n == "SID" || n == "__Secure-3PAPISID"
+                });
 
-                if !has_login_info || !has_sapisid {
+                if !has_auth {
                     continue;
                 }
 
                 sleep(Duration::from_millis(500)).await;
-                let cookies = window.cookies_for_url(yt_url.clone()).unwrap_or(cookies);
+                let cookies = window.cookies().unwrap_or(cookies);
 
                 let cookie_header = cookies
                     .iter()
@@ -77,9 +76,8 @@ pub async fn login_yt(app: &AppHandle) -> Result<profile::Model, AppError> {
                     .collect::<Vec<String>>()
                     .join("; ");
 
-                let profile = save_profile(&state, cookie_header).await?;
                 let _ = window.destroy();
-                return Ok(profile);
+                return save_profile(&state, cookie_header).await;
             }
         }
     }
@@ -112,7 +110,10 @@ async fn save_profile(state: &AppState, cookie_header: String) -> Result<profile
 }
 
 pub fn is_youtube_home(url: &tauri::Url) -> bool {
-    matches!(url.host_str(), Some("www.youtube.com" | "youtube.com"))
+    matches!(
+        url.host_str(),
+        Some("www.youtube.com" | "youtube.com" | "m.youtube.com")
+    ) && !url.as_str().contains("accounts.google.com")
         && !url.path().starts_with("/signin")
         && !url.path().starts_with("/account")
 }
