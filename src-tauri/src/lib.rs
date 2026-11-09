@@ -55,16 +55,3 @@ pub fn run() {
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn export_bindings() {
-        let builder = Builder::<tauri::Wry>::new().commands(app_commands!());
-        builder
-            .export(Typescript::default(), "../src/bindings.ts")
-            .expect("Failed to export typescript bindings");
-    }
-}

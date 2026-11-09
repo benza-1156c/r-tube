@@ -5,7 +5,7 @@ import { invoke as __TAURI_INVOKE } from "@tauri-apps/api/core";
 /** Commands */
 export const commands = {
 	greet: (name: string) => __TAURI_INVOKE<string>("greet", { name }),
-	openLoginWindow: () => typedError<null, AppError>(__TAURI_INVOKE("open_login_window")),
+	loginYt: () => typedError<Model, AppError>(__TAURI_INVOKE("login_yt")),
 	getActiveProfile: () => typedError<Model | null, AppError>(__TAURI_INVOKE("get_active_profile")),
 	getAllProfiles: () => typedError<Model[], AppError>(__TAURI_INVOKE("get_all_profiles")),
 	upsertProfile: (googleId: string, name: string, email: string, avatarUrl: string, cookies: string) => typedError<Model, AppError>(__TAURI_INVOKE("upsert_profile", { googleId, name, email, avatarUrl, cookies })),
@@ -36,4 +36,3 @@ async function typedError<T, E>(result: Promise<T>): Promise<{ status: "ok"; dat
         return { status: "error", error: e as any };
     }
 }
-
