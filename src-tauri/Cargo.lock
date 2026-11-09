@@ -654,8 +654,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1aa79e62e7697b8e29b513a68abacf485adcd1fe8284a4316c5ae868e6633327"
 dependencies = [
  "iana-time-zone",
+ "js-sys",
  "num-traits",
  "serde",
+ "wasm-bindgen",
  "windows-link",
 ]
 
@@ -3727,6 +3729,7 @@ checksum = "f8dcc9c7d52a811697d2151c701e0d08956f92b0e24136cf4cf27b57a6a0d9bf"
 name = "r-tube"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "innertube-rs",
  "rtube-macros",
  "sea-orm",
@@ -4748,6 +4751,7 @@ version = "2.0.0-rc.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ed155e448f42fc4be7a5cbc12bd43f6c549981f7c32fcba429ff6bc57cc4f30c"
 dependencies = [
+ "chrono",
  "paste",
  "rustc_version",
  "specta-macros",
