@@ -84,7 +84,10 @@ pub async fn set_active_profile(
     let txn = db.begin().await?;
 
     profile::Entity::update_many()
-        .col_expr(profile::Column::IsActive, sea_orm::sea_query::Expr::value(false))
+        .col_expr(
+            profile::Column::IsActive,
+            sea_orm::sea_query::Expr::value(false),
+        )
         .exec(&txn)
         .await?;
 
@@ -101,6 +104,17 @@ pub async fn set_active_profile(
     txn.commit().await?;
 
     Ok(updated)
+}
+
+pub async fn logout(db: &DatabaseConnection) -> Result<(), AppError> {
+    profile::Entity::update_many()
+        .col_expr(profile::Column::IsActive, true.into())
+        .filter(profile::Column::IsActive.eq(true))
+        .exec(db)
+        .await
+        .map_err(|e| AppError::internal(e))?;
+
+    Ok(())
 }
 
 pub async fn delete_profile(db: &DatabaseConnection, id: i32) -> Result<bool, AppError> {

@@ -5,6 +5,7 @@ import { invoke as __TAURI_INVOKE } from "@tauri-apps/api/core";
 /** Commands */
 export const commands = {
 	loginYt: () => typedError<Model, AppError_Serialize>(__TAURI_INVOKE("login_yt")),
+	logout: () => typedError<null, AppError_Serialize>(__TAURI_INVOKE("logout")),
 	greet: (name: string) => __TAURI_INVOKE<string>("greet", { name }),
 	getActiveProfile: () => typedError<Model | null, AppError_Serialize>(__TAURI_INVOKE("get_active_profile")),
 	getAllProfiles: () => typedError<Model[], AppError_Serialize>(__TAURI_INVOKE("get_all_profiles")),

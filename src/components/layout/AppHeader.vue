@@ -153,7 +153,14 @@ function clearSearch() {
               <span>Account Settings</span>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem @click="handleLogin">
+            <DropdownMenuItem
+              @click="
+                async () => {
+                  await commands.logout();
+                  handleLogin();
+                }
+              "
+            >
               <LogOut class="mr-2 h-4 w-4" />
               <span>Switch Account / Sign In</span>
             </DropdownMenuItem>

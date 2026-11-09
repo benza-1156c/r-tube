@@ -43,6 +43,7 @@ pub fn open_login_window(app: &AppHandle) -> Result<WebviewWindow, AppError> {
 pub async fn login_yt(app: &AppHandle) -> Result<profile::Model, AppError> {
     let _window = open_login_window(app)?;
     let state = app.state::<AppState>();
+    let yt_url: Url = "https://www.youtube.com".parse().unwrap();
 
     loop {
         sleep(Duration::from_millis(500)).await;
@@ -53,16 +54,22 @@ pub async fn login_yt(app: &AppHandle) -> Result<profile::Model, AppError> {
 
         if let Ok(url) = window.url() {
             if is_youtube_home(&url) {
-                let Ok(cookies) = window.cookies() else { continue };
+                let _ = window.hide();
+                let Ok(cookies) = window.cookies_for_url(yt_url.clone()) else {
+                    continue;
+                };
 
-                let has_auth = cookies.iter().any(|c| {
-                    let n = c.name();
-                    n == "LOGIN_INFO" || n == "SAPISID" || n == "SID"
-                });
+                let has_login_info = cookies.iter().any(|c| c.name() == "LOGIN_INFO");
+                let has_sapisid = cookies
+                    .iter()
+                    .any(|c| c.name() == "SAPISID" || c.name() == "__Secure-3PAPISID");
 
-                if !has_auth {
+                if !has_login_info || !has_sapisid {
                     continue;
                 }
+
+                sleep(Duration::from_millis(500)).await;
+                let cookies = window.cookies_for_url(yt_url.clone()).unwrap_or(cookies);
 
                 let cookie_header = cookies
                     .iter()
@@ -70,8 +77,9 @@ pub async fn login_yt(app: &AppHandle) -> Result<profile::Model, AppError> {
                     .collect::<Vec<String>>()
                     .join("; ");
 
+                let profile = save_profile(&state, cookie_header).await?;
                 let _ = window.destroy();
-                return save_profile(&state, cookie_header).await;
+                return Ok(profile);
             }
         }
     }
@@ -82,22 +90,15 @@ async fn save_profile(state: &AppState, cookie_header: String) -> Result<profile
 
     yt.load_session(None, &cookie_header).await?;
 
-    let accounts = yt.get_account_info().await?;
-    let account = accounts
-        .iter()
-        .find(|a| a.is_selected)
-        .cloned()
-        .or_else(|| accounts.first().cloned())
-        .ok_or_else(|| AppError::not_found_item("user account"))?;
+    let account = yt.get_account_info().await?;
 
-    let name = account.account_name;
-    let avatar_url = account.account_photo.unwrap_or_default();
+    println!("{:?}", account);
 
     let saved_profile = profile_service::upsert_profile(
         &state.db,
-        name,
-        String::new(),
-        avatar_url,
+        account.name,
+        account.email,
+        account.avatar_url,
         cookie_header.clone(),
     )
     .await?;
@@ -111,9 +112,7 @@ async fn save_profile(state: &AppState, cookie_header: String) -> Result<profile
 }
 
 pub fn is_youtube_home(url: &tauri::Url) -> bool {
-    let host_str = url.host_str().unwrap_or("");
-    let host_matches = host_str.ends_with("youtube.com");
-    let not_in_accounts = !url.as_str().contains("accounts.google.com");
-
-    host_matches && not_in_accounts
+    matches!(url.host_str(), Some("www.youtube.com" | "youtube.com"))
+        && !url.path().starts_with("/signin")
+        && !url.path().starts_with("/account")
 }
