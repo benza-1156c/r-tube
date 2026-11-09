@@ -14,10 +14,17 @@ declare module "vue-router" {
 
     /**
      * Whether this route completely hides the sidebar.
-     * - `true`: Hides the sidebar (e.g. watch page `/watch`).
+     * - `true`: Hides the sidebar (e.g. watch page `/watch`, login page `/login`).
      * - `false` or `undefined`: Displays the sidebar normally.
      */
     hideSidebar?: boolean;
+
+    /**
+     * Whether this route hides the top header bar.
+     * - `true`: Hides the header (e.g. login page `/login`).
+     * - `false` or `undefined`: Displays the header normally.
+     */
+    hideHeader?: boolean;
 
     /**
      * Automatically collapse the sidebar into icon-only mode.

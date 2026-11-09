@@ -139,6 +139,19 @@
   background: oklch(1 0 0 / 35%);
 }
 
+[data-sidebar],
+[data-slot="sidebar"],
+[data-sidebar="content"],
+[data-sidebar="footer"] {
+  overflow-x: hidden !important;
+}
+
+[data-sidebar]::-webkit-scrollbar:horizontal,
+[data-slot="sidebar"]::-webkit-scrollbar:horizontal {
+  display: none !important;
+  height: 0px !important;
+}
+
 
 button {
     cursor: pointer;

@@ -1,15 +1,5 @@
 <script setup lang="ts">
-import {
-  Menu,
-  Search,
-  Moon,
-  Sun,
-  User,
-  LogOut,
-  Play,
-  X,
-  Loader2,
-} from "@lucide/vue";
+import { Menu, Moon, Sun, User, LogOut, X, Loader2 } from "@lucide/vue";
 import { commands, type Model } from "@/bindings";
 import { useSidebar } from "@/lib/components/ui/sidebar";
 
@@ -26,7 +16,6 @@ const activeProfile = ref<Model | null>(null);
 const isLoggingIn = ref(false);
 
 onMounted(async () => {
-  // Sync dark mode class
   document.documentElement.classList.add("dark");
 
   try {
@@ -49,20 +38,7 @@ function toggleTheme() {
 }
 
 async function handleLogin() {
-  if (isLoggingIn.value) return;
-  isLoggingIn.value = true;
-  try {
-    const res = await commands.loginYt();
-    if (res.status === "ok") {
-      activeProfile.value = res.data;
-    } else {
-      console.error("Login failed:", res.error);
-    }
-  } catch (err) {
-    console.error("Login error:", err);
-  } finally {
-    isLoggingIn.value = false;
-  }
+  router.push("/login");
 }
 
 function handleSearch() {
@@ -96,11 +72,6 @@ function clearSearch() {
         class="flex items-center gap-2 group cursor-pointer focus:outline-hidden"
         @click="router.push('/')"
       >
-        <div
-          class="flex h-7 w-9 items-center justify-center rounded-lg bg-red-600 text-white shadow-sm transition-transform group-hover:scale-105"
-        >
-          <Play class="h-4 w-4 fill-white translate-x-0.5" />
-        </div>
         <span
           class="text-lg font-bold tracking-tight text-foreground font-heading"
         >
@@ -115,8 +86,8 @@ function clearSearch() {
         <Input
           v-model="searchQuery"
           type="text"
-          placeholder="Search videos, music, or channels..."
-          class="h-9 w-full rounded-l-full rounded-r-none border-border bg-muted/40 pl-4 pr-9 text-sm focus-visible:ring-1 focus-visible:ring-primary"
+          placeholder="Search"
+          class="h-9 w-full rounded-md border-border bg-muted/40 pl-4 pr-9 text-sm focus-visible:ring-1 focus-visible:ring-primary"
           @keydown.enter="handleSearch"
         />
         <button
@@ -128,14 +99,6 @@ function clearSearch() {
           <X class="h-4 w-4" />
         </button>
       </div>
-      <Button
-        type="button"
-        variant="secondary"
-        class="h-9 rounded-l-none rounded-r-full border border-l-0 border-border px-5 hover:bg-accent"
-        @click="handleSearch"
-      >
-        <Search class="h-4 w-4 text-muted-foreground" />
-      </Button>
     </div>
 
     <!-- Right Section: Actions & Profile -->

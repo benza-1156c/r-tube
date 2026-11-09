@@ -36,8 +36,8 @@ function navigateTo(path: string) {
 </script>
 
 <template>
-  <Sidebar collapsible="icon" class="border-r border-border/40">
-    <SidebarContent class="pt-2">
+  <Sidebar collapsible="icon" class="border-r border-border/40 overflow-hidden">
+    <SidebarContent class="pt-2 overflow-y-auto overflow-x-hidden">
       <!-- Main Navigation Group -->
       <SidebarGroup>
         <SidebarGroupContent>
@@ -80,27 +80,23 @@ function navigateTo(path: string) {
           </SidebarMenu>
         </SidebarGroupContent>
       </SidebarGroup>
-
-      <SidebarSeparator class="my-2" />
-
-      <!-- Settings Group -->
-      <SidebarGroup class="mt-auto">
-        <SidebarGroupContent>
-          <SidebarMenu>
-            <SidebarMenuItem v-for="item in settingsItems" :key="item.path">
-              <SidebarMenuButton
-                :is-active="currentPath === item.path"
-                :tooltip="item.title"
-                class="gap-3 transition-colors hover:bg-accent cursor-pointer"
-                @click="navigateTo(item.path)"
-              >
-                <component :is="item.icon" class="h-4 w-4" />
-                <span class="font-medium text-sm">{{ item.title }}</span>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SidebarMenu>
-        </SidebarGroupContent>
-      </SidebarGroup>
     </SidebarContent>
+
+    <!-- Pinned Bottom Footer for Settings -->
+    <SidebarFooter class="p-2 border-t border-border/20 mt-auto">
+      <SidebarMenu>
+        <SidebarMenuItem v-for="item in settingsItems" :key="item.path">
+          <SidebarMenuButton
+            :is-active="currentPath === item.path"
+            :tooltip="item.title"
+            class="gap-3 transition-colors hover:bg-accent cursor-pointer"
+            @click="navigateTo(item.path)"
+          >
+            <component :is="item.icon" class="h-4 w-4" />
+            <span class="font-medium text-sm">{{ item.title }}</span>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
+      </SidebarMenu>
+    </SidebarFooter>
   </Sidebar>
 </template>

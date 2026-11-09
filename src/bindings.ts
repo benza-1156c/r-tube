@@ -4,17 +4,21 @@ import { invoke as __TAURI_INVOKE } from "@tauri-apps/api/core";
 
 /** Commands */
 export const commands = {
-	loginYt: () => typedError<Model, AppError>(__TAURI_INVOKE("login_yt")),
+	loginYt: () => typedError<Model, AppError_Serialize>(__TAURI_INVOKE("login_yt")),
 	greet: (name: string) => __TAURI_INVOKE<string>("greet", { name }),
-	getActiveProfile: () => typedError<Model | null, AppError>(__TAURI_INVOKE("get_active_profile")),
-	getAllProfiles: () => typedError<Model[], AppError>(__TAURI_INVOKE("get_all_profiles")),
-	upsertProfile: (googleId: string, name: string, email: string, avatarUrl: string, cookies: string) => typedError<Model, AppError>(__TAURI_INVOKE("upsert_profile", { googleId, name, email, avatarUrl, cookies })),
-	setActiveProfile: (id: number) => typedError<Model, AppError>(__TAURI_INVOKE("set_active_profile", { id })),
-	deleteProfile: (id: number) => typedError<boolean, AppError>(__TAURI_INVOKE("delete_profile", { id })),
+	getActiveProfile: () => typedError<Model | null, AppError_Serialize>(__TAURI_INVOKE("get_active_profile")),
+	getAllProfiles: () => typedError<Model[], AppError_Serialize>(__TAURI_INVOKE("get_all_profiles")),
+	upsertProfile: (name: string, email: string, avatarUrl: string, cookies: string) => typedError<Model, AppError_Serialize>(__TAURI_INVOKE("upsert_profile", { name, email, avatarUrl, cookies })),
+	setActiveProfile: (id: number) => typedError<Model, AppError_Serialize>(__TAURI_INVOKE("set_active_profile", { id })),
+	deleteProfile: (id: number) => typedError<boolean, AppError_Serialize>(__TAURI_INVOKE("delete_profile", { id })),
 };
 
 /* Types */
-export type AppError = { type: "Database"; message: string } | { type: "NotFound"; message: string } | { type: "Validation"; message: string } | { type: "Internal"; message: string };
+export type AppError = AppError_Serialize | AppError_Deserialize;
+
+export type AppError_Deserialize = { type: "Database"; message: string } | { type: "NotFound"; message: string } | { type: "Validation"; message: string } | { type: "Internal"; message: string };
+
+export type AppError_Serialize = { type: "Database"; message: string } | { type: "NotFound"; message: string } | { type: "Validation"; message: string } | { type: "Internal"; message: string };
 
 export type Model = {
 	id: number,

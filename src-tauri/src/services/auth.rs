@@ -13,12 +13,7 @@ const YOUTUBE_LOGIN_URL: &str = "https://accounts.google.com/ServiceLogin?servic
 
 pub fn open_login_window(app: &AppHandle) -> Result<WebviewWindow, AppError> {
     if let Some(window) = app.get_webview_window(LOGIN_WINDOW_LABEL) {
-        window
-            .show()
-            .map_err(|e| AppError::Internal(e.to_string()))?;
-        window
-            .set_focus()
-            .map_err(|e| AppError::Internal(e.to_string()))?;
+        let _ = window.set_focus();
         return Ok(window);
     }
 
@@ -26,15 +21,23 @@ pub fn open_login_window(app: &AppHandle) -> Result<WebviewWindow, AppError> {
         .parse()
         .map_err(|e| AppError::Internal(format!("Invalid login URL: {e}")))?;
 
-    let webview = WebviewWindowBuilder::new(app, LOGIN_WINDOW_LABEL, WebviewUrl::External(url))
+    let login_profile_dir = app
+        .path()
+        .app_local_data_dir()
+        .map_err(|e| AppError::Internal(e.to_string()))?
+        .join("LoginProfile");
+
+    if login_profile_dir.exists() {
+        let _ = std::fs::remove_dir_all(&login_profile_dir);
+    }
+
+    WebviewWindowBuilder::new(app, LOGIN_WINDOW_LABEL, WebviewUrl::External(url))
         .title("Sign in to YouTube")
         .inner_size(500.0, 720.0)
         .center()
-        .resizable(true)
+        .data_directory(login_profile_dir)
         .build()
-        .map_err(|e| AppError::Internal(format!("Failed to create login window: {e}")))?;
-
-    Ok(webview)
+        .map_err(|e| AppError::Internal(format!("Failed to create login window: {e}")))
 }
 
 pub async fn login_yt(app: &AppHandle) -> Result<profile::Model, AppError> {
@@ -42,41 +45,33 @@ pub async fn login_yt(app: &AppHandle) -> Result<profile::Model, AppError> {
     let state = app.state::<AppState>();
 
     loop {
-        sleep(Duration::from_secs(1)).await;
+        sleep(Duration::from_millis(500)).await;
 
-        if app.get_webview_window(LOGIN_WINDOW_LABEL).is_none() {
+        let Some(window) = app.get_webview_window(LOGIN_WINDOW_LABEL) else {
             return Err(AppError::not_found_item("window"));
-        }
+        };
 
-        if let Some(window) = app.get_webview_window(LOGIN_WINDOW_LABEL) {
-            if let Ok(url) = window.url() {
-                let host = url.host_str().unwrap_or("");
+        if let Ok(url) = window.url() {
+            if is_youtube_home(&url) {
+                let Ok(cookies) = window.cookies() else { continue };
 
-                if host == "www.youtube.com" || host == "youtube.com" {
-                    let cookies = window
-                        .cookies()
-                        .map_err(|e| AppError::Internal(e.to_string()))?;
+                let has_auth = cookies.iter().any(|c| {
+                    let n = c.name();
+                    n == "LOGIN_INFO" || n == "SAPISID" || n == "SID"
+                });
 
-                    let has_auth = cookies.iter().any(|c| {
-                        c.name() == "SAPISID"
-                            || c.name() == "__Secure-3PAPISID"
-                            || c.name() == "LOGIN_INFO"
-                    });
-
-                    if has_auth {
-                        let cookie_header = cookies
-                            .iter()
-                            .map(|c| format!("{}={}", c.name(), c.value()))
-                            .collect::<Vec<String>>()
-                            .join("; ");
-
-                        let profile = save_profile(&state, cookie_header).await?;
-
-                        let _ = window.clear_all_browsing_data();
-                        let _ = window.destroy();
-                        return Ok(profile);
-                    }
+                if !has_auth {
+                    continue;
                 }
+
+                let cookie_header = cookies
+                    .iter()
+                    .map(|c| format!("{}={}", c.name(), c.value()))
+                    .collect::<Vec<String>>()
+                    .join("; ");
+
+                let _ = window.destroy();
+                return save_profile(&state, cookie_header).await;
             }
         }
     }
@@ -87,22 +82,22 @@ async fn save_profile(state: &AppState, cookie_header: String) -> Result<profile
 
     yt.load_session(None, &cookie_header).await?;
 
-    let user = yt.get_current_user_profile().await?;
+    let accounts = yt.get_account_info().await?;
+    let account = accounts
+        .iter()
+        .find(|a| a.is_selected)
+        .cloned()
+        .or_else(|| accounts.first().cloned())
+        .ok_or_else(|| AppError::not_found_item("user account"))?;
 
-    let google_id = if !user.email.is_empty() {
-        user.email.clone()
-    } else if let Some(ref handle) = user.handle {
-        handle.clone()
-    } else {
-        user.name.clone()
-    };
+    let name = account.account_name;
+    let avatar_url = account.account_photo.unwrap_or_default();
 
     let saved_profile = profile_service::upsert_profile(
         &state.db,
-        google_id,
-        user.name,
-        user.email,
-        user.avatar_url,
+        name,
+        String::new(),
+        avatar_url,
         cookie_header.clone(),
     )
     .await?;
@@ -113,4 +108,12 @@ async fn save_profile(state: &AppState, cookie_header: String) -> Result<profile
         .await?;
 
     Ok(active_profile)
+}
+
+pub fn is_youtube_home(url: &tauri::Url) -> bool {
+    let host_str = url.host_str().unwrap_or("");
+    let host_matches = host_str.ends_with("youtube.com");
+    let not_in_accounts = !url.as_str().contains("accounts.google.com");
+
+    host_matches && not_in_accounts
 }

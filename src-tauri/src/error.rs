@@ -6,16 +6,52 @@ use thiserror::Error;
 #[serde(tag = "type", content = "message")]
 pub enum AppError {
     #[error("Database error: {0}")]
-    Database(String),
+    Database(#[specta(type = String)] #[serde(serialize_with = "log_database")] String),
 
     #[error("{0}")]
-    NotFound(String),
+    NotFound(#[specta(type = String)] #[serde(serialize_with = "log_not_found")] String),
 
     #[error("Validation error: {0}")]
-    Validation(String),
+    Validation(#[specta(type = String)] #[serde(serialize_with = "log_validation")] String),
 
     #[error("Internal error: {0}")]
-    Internal(String),
+    Internal(#[specta(type = String)] #[serde(serialize_with = "log_internal")] String),
+}
+
+fn log_error<S>(variant: &str, msg: &str, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    eprintln!("\x1b[1;31m[AppError::{variant}]\x1b[0m {msg}");
+    serializer.serialize_str(msg)
+}
+
+fn log_database<S>(msg: &str, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    log_error("Database", msg, serializer)
+}
+
+fn log_not_found<S>(msg: &str, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    log_error("NotFound", msg, serializer)
+}
+
+fn log_validation<S>(msg: &str, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    log_error("Validation", msg, serializer)
+}
+
+fn log_internal<S>(msg: &str, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    log_error("Internal", msg, serializer)
 }
 
 impl AppError {
@@ -46,6 +82,18 @@ impl AppError {
     /// `AppError::validation("invalid input")`
     pub fn validation(msg: impl std::fmt::Display) -> Self {
         Self::Validation(msg.to_string())
+    }
+
+    /// Explicitly log this error to console and return self
+    pub fn log(self) -> Self {
+        let variant = match &self {
+            AppError::Database(_) => "Database",
+            AppError::NotFound(_) => "NotFound",
+            AppError::Validation(_) => "Validation",
+            AppError::Internal(_) => "Internal",
+        };
+        eprintln!("\x1b[1;31m[AppError::{variant}]\x1b[0m {self}");
+        self
     }
 }
 

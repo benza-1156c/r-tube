@@ -23,13 +23,12 @@ pub async fn get_all_profiles(
 #[app_command]
 pub async fn upsert_profile(
     state: State<'_, AppState>,
-    google_id: String,
     name: String,
     email: String,
     avatar_url: String,
     cookies: String,
 ) -> Result<profile::Model, AppError> {
-    profile_service::upsert_profile(&state.db, google_id, name, email, avatar_url, cookies).await
+    profile_service::upsert_profile(&state.db, name, email, avatar_url, cookies).await
 }
 
 #[app_command]

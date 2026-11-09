@@ -29,14 +29,18 @@ pub async fn get_all_profiles(db: &DatabaseConnection) -> Result<Vec<profile::Mo
 
 pub async fn upsert_profile(
     db: &DatabaseConnection,
-    google_id: String,
     name: String,
     email: String,
     avatar_url: String,
     cookies: String,
 ) -> Result<profile::Model, AppError> {
     let existing = profile::Entity::find()
-        .filter(profile::Column::GoogleId.eq(&google_id))
+        .filter(
+            profile::Column::Name
+                .eq(&name)
+                .or(profile::Column::GoogleId.eq(&name))
+                .or(profile::Column::GoogleId.eq("No channel")),
+        )
         .one(db)
         .await?;
 
@@ -44,6 +48,7 @@ pub async fn upsert_profile(
 
     if let Some(existing) = existing {
         let mut active: profile::ActiveModel = existing.into();
+        active.google_id = Set(name.clone());
         active.name = Set(name);
         active.email = Set(email);
         active.avatar_url = Set(avatar_url);
@@ -57,7 +62,7 @@ pub async fn upsert_profile(
         let is_first = count == 0;
 
         let new_profile = profile::ActiveModel {
-            google_id: Set(google_id),
+            google_id: Set(name.clone()),
             name: Set(name),
             email: Set(email),
             avatar_url: Set(avatar_url),
