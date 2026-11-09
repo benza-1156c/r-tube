@@ -39,11 +39,32 @@ pub fn run() {
                     .await
                     .expect("Failed to initialize database");
 
-                app_handle.manage(AppState::new(db, app_path));
+                let yt = std::sync::Arc::new(
+                    services::youtube::YoutubeClient::new()
+                        .await
+                        .expect("Failed to initialize YouTube client"),
+                );
+
+                let _ = yt.init_from_active_profile(&db).await;
+
+                app_handle.manage(AppState::new(db, app_path, yt));
             });
 
             Ok(())
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn export_bindings() {
+        let builder = Builder::<tauri::Wry>::new().commands(app_commands!());
+        builder
+            .export(Typescript::default(), "../src/bindings.ts")
+            .expect("Failed to export typescript bindings");
+    }
 }

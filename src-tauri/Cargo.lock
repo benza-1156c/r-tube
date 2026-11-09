@@ -3731,6 +3731,7 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "innertube-rs",
+ "reqwest 0.12.28",
  "rtube-macros",
  "sea-orm",
  "sea-orm-migration",
