@@ -126,6 +126,20 @@
   }
 }
 
+
+::-webkit-scrollbar {
+  width: 2px;
+  height: 2px;
+}
+::-webkit-scrollbar-thumb {
+  background: oklch(1 0 0 / 22%);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: oklch(1 0 0 / 35%);
+}
+
+
 button {
     cursor: pointer;
 }

@@ -3,14 +3,53 @@ import vue from "@vitejs/plugin-vue";
 import process from "node:process";
 import tailwindcss from "@tailwindcss/vite";
 import path from "node:path";
+import VueRouter from "unplugin-vue-router/vite";
+import { VueRouterAutoImports } from "unplugin-vue-router";
+import AutoImport from "unplugin-auto-import/vite";
+import Components from "unplugin-vue-components/vite";
+
 const host = process.env.TAURI_DEV_HOST;
 
 // https://vite.dev/config/
 export default defineConfig(() => ({
-  plugins: [vue(), tailwindcss()],
+  plugins: [
+    VueRouter({
+      routesFolder: "src/router",
+      extensions: [".vue"],
+      dts: "src/types/typed-router.d.ts",
+      extendRoute(route) {
+        if (route.path.startsWith("/watch")) {
+          route.addToMeta({ hideSidebar: true });
+        }
+      },
+    }),
+    vue(),
+    tailwindcss(),
+    AutoImport({
+      imports: [
+        "vue",
+        VueRouterAutoImports,
+        "@vueuse/core",
+      ],
+      dirs: [
+        "src/lib",
+      ],
+      dts: "src/types/auto-imports.d.ts",
+      vueTemplate: true,
+    }),
+    Components({
+      dirs: [
+        "src/components",
+        "src/lib/components",
+      ],
+      extensions: ["vue"],
+      deep: true,
+      dts: "src/types/components.d.ts",
+    }),
+  ],
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./src"),
+      "@": path.resolve(import.meta.dirname, "./src"),
     },
   },
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`

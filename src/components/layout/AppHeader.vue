@@ -1,0 +1,217 @@
+<script setup lang="ts">
+import {
+  Menu,
+  Search,
+  Moon,
+  Sun,
+  User,
+  LogOut,
+  Play,
+  X,
+  Loader2,
+} from "@lucide/vue";
+import { commands, type Model } from "@/bindings";
+import { useSidebar } from "@/lib/components/ui/sidebar";
+
+defineProps<{
+  hideSidebar?: boolean;
+}>();
+
+const router = useRouter();
+const { toggleSidebar } = useSidebar();
+
+const searchQuery = ref("");
+const isDark = ref(true);
+const activeProfile = ref<Model | null>(null);
+const isLoggingIn = ref(false);
+
+onMounted(async () => {
+  // Sync dark mode class
+  document.documentElement.classList.add("dark");
+
+  try {
+    const res = await commands.getActiveProfile();
+    if (res.status === "ok" && res.data) {
+      activeProfile.value = res.data;
+    }
+  } catch (err) {
+    console.error("Failed to fetch active profile:", err);
+  }
+});
+
+function toggleTheme() {
+  isDark.value = !isDark.value;
+  if (isDark.value) {
+    document.documentElement.classList.add("dark");
+  } else {
+    document.documentElement.classList.remove("dark");
+  }
+}
+
+async function handleLogin() {
+  if (isLoggingIn.value) return;
+  isLoggingIn.value = true;
+  try {
+    const res = await commands.loginYt();
+    if (res.status === "ok") {
+      activeProfile.value = res.data;
+    } else {
+      console.error("Login failed:", res.error);
+    }
+  } catch (err) {
+    console.error("Login error:", err);
+  } finally {
+    isLoggingIn.value = false;
+  }
+}
+
+function handleSearch() {
+  if (!searchQuery.value.trim()) return;
+  console.log("Searching for:", searchQuery.value);
+}
+
+function clearSearch() {
+  searchQuery.value = "";
+}
+</script>
+
+<template>
+  <header
+    class="sticky top-0 z-40 flex h-14 w-full items-center justify-between border-b border-border/40 bg-background/95 px-4 backdrop-blur-md"
+  >
+    <!-- Left Section: Toggle & Logo -->
+    <div class="flex items-center gap-3">
+      <Button
+        v-if="!hideSidebar"
+        variant="ghost"
+        size="icon"
+        class="h-9 w-9 text-foreground/80 hover:bg-accent hover:text-foreground"
+        @click="toggleSidebar"
+      >
+        <Menu class="h-5 w-5" />
+        <span class="sr-only">Toggle Sidebar</span>
+      </Button>
+
+      <button
+        class="flex items-center gap-2 group cursor-pointer focus:outline-hidden"
+        @click="router.push('/')"
+      >
+        <div
+          class="flex h-7 w-9 items-center justify-center rounded-lg bg-red-600 text-white shadow-sm transition-transform group-hover:scale-105"
+        >
+          <Play class="h-4 w-4 fill-white translate-x-0.5" />
+        </div>
+        <span
+          class="text-lg font-bold tracking-tight text-foreground font-heading"
+        >
+          R-Tube
+        </span>
+      </button>
+    </div>
+
+    <!-- Center Section: Search Bar -->
+    <div class="flex flex-1 max-w-xl mx-4 items-center">
+      <div class="relative w-full flex items-center">
+        <Input
+          v-model="searchQuery"
+          type="text"
+          placeholder="Search videos, music, or channels..."
+          class="h-9 w-full rounded-l-full rounded-r-none border-border bg-muted/40 pl-4 pr-9 text-sm focus-visible:ring-1 focus-visible:ring-primary"
+          @keydown.enter="handleSearch"
+        />
+        <button
+          v-if="searchQuery"
+          type="button"
+          class="absolute right-2 text-muted-foreground hover:text-foreground cursor-pointer"
+          @click="clearSearch"
+        >
+          <X class="h-4 w-4" />
+        </button>
+      </div>
+      <Button
+        type="button"
+        variant="secondary"
+        class="h-9 rounded-l-none rounded-r-full border border-l-0 border-border px-5 hover:bg-accent"
+        @click="handleSearch"
+      >
+        <Search class="h-4 w-4 text-muted-foreground" />
+      </Button>
+    </div>
+
+    <!-- Right Section: Actions & Profile -->
+    <div class="flex items-center gap-2">
+      <!-- Dark / Light Theme Toggle -->
+      <Button
+        variant="ghost"
+        size="icon"
+        class="h-9 w-9 text-muted-foreground hover:text-foreground"
+        @click="toggleTheme"
+      >
+        <Sun v-if="isDark" class="h-4 w-4" />
+        <Moon v-else class="h-4 w-4" />
+        <span class="sr-only">Toggle theme</span>
+      </Button>
+
+      <!-- Authenticated Profile Dropdown or Sign In Button -->
+      <template v-if="activeProfile">
+        <DropdownMenu>
+          <DropdownMenuTrigger as-child>
+            <button
+              class="flex items-center gap-2 rounded-full p-0.5 ring-2 ring-primary/20 hover:ring-primary/40 focus:outline-hidden cursor-pointer"
+            >
+              <img
+                v-if="activeProfile.avatar_url"
+                :src="activeProfile.avatar_url"
+                :alt="activeProfile.name"
+                class="h-8 w-8 rounded-full object-cover"
+              />
+              <div
+                v-else
+                class="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground font-semibold text-xs"
+              >
+                {{ activeProfile.name.slice(0, 2).toUpperCase() }}
+              </div>
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" class="w-56">
+            <DropdownMenuLabel class="font-normal">
+              <div class="flex flex-col space-y-1">
+                <p class="text-sm font-semibold leading-none text-foreground">
+                  {{ activeProfile.name }}
+                </p>
+                <p class="text-xs leading-none text-muted-foreground">
+                  {{ activeProfile.email || activeProfile.google_id }}
+                </p>
+              </div>
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem @click="router.push('/settings')">
+              <User class="mr-2 h-4 w-4" />
+              <span>Account Settings</span>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem @click="handleLogin">
+              <LogOut class="mr-2 h-4 w-4" />
+              <span>Switch Account / Sign In</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </template>
+
+      <!-- Guest Login Button -->
+      <template v-else>
+        <Button
+          size="sm"
+          variant="outline"
+          class="gap-1.5 rounded-full border-primary/30 text-primary hover:bg-primary/10"
+          :disabled="isLoggingIn"
+          @click="handleLogin"
+        >
+          <Loader2 v-if="isLoggingIn" class="h-4 w-4 animate-spin" />
+          <User v-else class="h-4 w-4" />
+          <span>{{ isLoggingIn ? "Signing in..." : "Sign in" }}</span>
+        </Button>
+      </template>
+    </div>
+  </header>
+</template>
