@@ -109,17 +109,14 @@ Access-Control-Allow-Origin: *\r\n\
 Access-Control-Allow-Methods: GET, HEAD, OPTIONS\r\n\
 Access-Control-Allow-Headers: *\r\n\
 Access-Control-Max-Age: 86400\r\n\
-Connection: close\r\n\
 Content-Length: 0\r\n\r\n";
         stream.write_all(cors_resp.as_bytes()).await?;
-        let _ = stream.shutdown().await;
         return Ok(());
     }
 
     if method != "GET" && method != "HEAD" {
-        let err_resp = "HTTP/1.1 405 Method Not Allowed\r\nConnection: close\r\nContent-Length: 0\r\n\r\n";
+        let err_resp = "HTTP/1.1 405 Method Not Allowed\r\nContent-Length: 0\r\n\r\n";
         stream.write_all(err_resp.as_bytes()).await?;
-        let _ = stream.shutdown().await;
         return Ok(());
     }
 
@@ -135,9 +132,8 @@ Content-Length: 0\r\n\r\n";
     let target_url = match target_url {
         Some(u) if !u.is_empty() => u,
         _ => {
-            let err_resp = "HTTP/1.1 400 Bad Request\r\nConnection: close\r\nContent-Length: 0\r\n\r\n";
+            let err_resp = "HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\n\r\n";
             stream.write_all(err_resp.as_bytes()).await?;
-            let _ = stream.shutdown().await;
             return Ok(());
         }
     };
@@ -171,12 +167,11 @@ Content-Length: 0\r\n\r\n";
         Err(e) => {
             let err_msg = e.to_string();
             let msg = format!(
-                "HTTP/1.1 502 Bad Gateway\r\nConnection: close\r\nContent-Length: {}\r\n\r\n{}",
+                "HTTP/1.1 502 Bad Gateway\r\nContent-Length: {}\r\n\r\n{}",
                 err_msg.len(),
                 err_msg
             );
             let _ = stream.write_all(msg.as_bytes()).await;
-            let _ = stream.shutdown().await;
             return Ok(());
         }
     };
@@ -190,7 +185,7 @@ Content-Length: 0\r\n\r\n";
 
     let status = resp.status();
     let mut head = format!(
-        "HTTP/1.1 {} {}\r\nConnection: close\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Expose-Headers: Content-Length, Content-Range, Content-Type, Accept-Ranges\r\n",
+        "HTTP/1.1 {} {}\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Expose-Headers: Content-Length, Content-Range, Content-Type, Accept-Ranges\r\n",
         status.as_u16(),
         status.canonical_reason().unwrap_or("OK")
     );
@@ -214,15 +209,12 @@ Content-Length: 0\r\n\r\n";
         if let Ok(v) = ar.to_str() {
             head.push_str(&format!("Accept-Ranges: {}\r\n", v));
         }
-    } else {
-        head.push_str("Accept-Ranges: bytes\r\n");
     }
     head.push_str("\r\n");
 
     stream.write_all(head.as_bytes()).await?;
 
     if method == "HEAD" {
-        let _ = stream.shutdown().await;
         return Ok(());
     }
 
@@ -237,7 +229,6 @@ Content-Length: 0\r\n\r\n";
             Err(_) => break,
         }
     }
-    let _ = stream.shutdown().await;
 
     Ok(())
 }
