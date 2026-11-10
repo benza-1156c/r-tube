@@ -12,8 +12,12 @@ use crate::state::AppState;
 pub async fn get_home_feed(
     state: State<'_, AppState>,
     continuation: Option<String>,
+    params: Option<String>,
 ) -> Result<HomeFeed, AppError> {
-    let feed = state.yt.get_home_feed(continuation.as_deref()).await?;
+    let feed = state
+        .yt
+        .get_home_feed(continuation.as_deref(), params.as_deref())
+        .await?;
     Ok(feed.into())
 }
 

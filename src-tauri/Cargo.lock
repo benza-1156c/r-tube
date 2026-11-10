@@ -2265,8 +2265,7 @@ dependencies = [
 [[package]]
 name = "innertube-rs"
 version = "0.10.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9fef86219787162d33807e730eb94beafcbfed8bdb69c9586a72e370917461ee"
+source = "git+https://github.com/caya8205-2/innertube-rs?branch=main#f4b3b11c2f09a906959ea5609b361bdd6b97ebcc"
 dependencies = [
  "base64 0.23.1",
  "bytes",

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { VideoItem } from "./VideoCard.vue";
+import { VideoItem } from "@/bindings";
 
 defineProps<{
   videos: VideoItem[];
@@ -8,10 +8,14 @@ defineProps<{
 </script>
 
 <template>
-  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-x-4 gap-y-7 p-6">
+  <div
+    class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-x-4 gap-y-7 p-6"
+  >
+    <VideoCard v-for="video in videos" :key="video.id" :video="video" />
+
     <!-- Skeleton Loaders -->
     <template v-if="loading">
-      <div v-for="i in 8" :key="i" class="flex flex-col gap-3">
+      <div v-for="i in 8" :key="`skeleton-${i}`" class="flex flex-col gap-3">
         <Skeleton class="aspect-video w-full rounded-xl" />
         <div class="flex gap-3">
           <Skeleton class="h-9 w-9 rounded-full shrink-0" />
@@ -22,15 +26,5 @@ defineProps<{
         </div>
       </div>
     </template>
-
-    <!-- Video Cards -->
-    <template v-else>
-      <VideoCard
-        v-for="video in videos"
-        :key="video.id"
-        :video="video"
-      />
-    </template>
   </div>
 </template>
-

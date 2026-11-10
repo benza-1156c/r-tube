@@ -11,6 +11,7 @@ pub struct VideoItem {
     pub channel_name: String,
     pub channel_avatar_url: String,
     pub is_verified: bool,
+    pub is_live: bool,
     pub view_count: String,
     pub published_at: String,
 }
@@ -96,6 +97,14 @@ pub struct WatchNextResults {
     pub continuation_token: Option<String>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct CurrentUserProfile {
+    pub name: String,
+    pub avatar_url: Option<String>,
+    pub channel_id: Option<String>,
+}
+
 // ---------------------------------------------------------------------------
 // Conversion from innertube-rs types
 // ---------------------------------------------------------------------------
@@ -109,12 +118,18 @@ impl From<&innertube_rs::VideoNode> for VideoItem {
             .unwrap_or_default()
             .to_string();
 
+        let channel_name = v
+            .author
+            .as_ref()
+            .map(|a| a.name.clone())
+            .unwrap_or_default();
         let channel_avatar_url = v
             .author
             .as_ref()
             .and_then(|a| a.thumbnails.best_url().or_else(|| a.thumbnails.first_url()))
             .unwrap_or_default()
             .to_string();
+        let is_verified = v.author.as_ref().map(|a| a.is_verified).unwrap_or(false);
 
         Self {
             id: v.id.clone(),
@@ -125,13 +140,10 @@ impl From<&innertube_rs::VideoNode> for VideoItem {
             } else {
                 v.duration.clone().unwrap_or_default()
             },
-            channel_name: v
-                .author
-                .as_ref()
-                .map(|a| a.name.clone())
-                .unwrap_or_default(),
+            channel_name,
             channel_avatar_url,
-            is_verified: v.author.as_ref().map(|a| a.is_verified).unwrap_or(false),
+            is_verified,
+            is_live: v.is_live,
             view_count: v.view_count.clone().unwrap_or_default(),
             published_at: v.published_time.clone().unwrap_or_default(),
         }
@@ -188,6 +200,7 @@ impl From<innertube_rs::SearchResults> for SearchResults {
                         .or_else(|| v.thumbnails.first())
                         .map(|t| t.url.clone())
                         .unwrap_or_default();
+
                     Some(VideoItem {
                         id: v.video_id,
                         title: v.title,
@@ -196,6 +209,7 @@ impl From<innertube_rs::SearchResults> for SearchResults {
                         channel_name: v.author,
                         channel_avatar_url: String::new(),
                         is_verified: false,
+                        is_live: false,
                         view_count: v.view_count.unwrap_or_default(),
                         published_at: v.published_time.unwrap_or_default(),
                     })
@@ -333,6 +347,7 @@ impl From<innertube_rs::WatchNextResults> for WatchNextResults {
                     channel_name: r.author,
                     channel_avatar_url: String::new(),
                     is_verified: false,
+                    is_live: r.is_live,
                     view_count: r.view_count_text.unwrap_or_default(),
                     published_at: r.published_time_text.unwrap_or_default(),
                 }

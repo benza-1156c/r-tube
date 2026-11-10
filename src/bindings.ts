@@ -12,7 +12,7 @@ export const commands = {
 	upsertProfile: (name: string, email: string, avatarUrl: string, cookies: string) => typedError<Model, AppError_Serialize>(__TAURI_INVOKE("upsert_profile", { name, email, avatarUrl, cookies })),
 	setActiveProfile: (id: number) => typedError<Model, AppError_Serialize>(__TAURI_INVOKE("set_active_profile", { id })),
 	deleteProfile: (id: number) => typedError<boolean, AppError_Serialize>(__TAURI_INVOKE("delete_profile", { id })),
-	getHomeFeed: (continuation: string | null) => typedError<HomeFeed_Serialize, AppError_Serialize>(__TAURI_INVOKE("get_home_feed", { continuation })),
+	getHomeFeed: (continuation: string | null, params: string | null) => typedError<HomeFeed_Serialize, AppError_Serialize>(__TAURI_INVOKE("get_home_feed", { continuation, params })),
 	getSubscriptionsFeed: () => typedError<BrowseFeed_Serialize, AppError_Serialize>(__TAURI_INVOKE("get_subscriptions_feed")),
 	getTrending: () => typedError<TrendingFeed, AppError_Serialize>(__TAURI_INVOKE("get_trending")),
 	search: (query: string, continuation: string | null) => typedError<SearchResults_Serialize, AppError_Serialize>(__TAURI_INVOKE("search", { query, continuation })),
@@ -158,6 +158,7 @@ export type VideoItem = {
 	channelName: string,
 	channelAvatarUrl: string,
 	isVerified: boolean,
+	isLive: boolean,
 	viewCount: string,
 	publishedAt: string,
 };

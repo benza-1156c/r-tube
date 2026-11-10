@@ -1,45 +1,44 @@
 <script setup lang="ts">
+import type { FilterChip } from "@/bindings";
+
+const props = withDefaults(
+  defineProps<{
+    chips?: FilterChip[];
+    selected?: string;
+  }>(),
+  {
+    chips: () => [],
+    selected: "All",
+  },
+);
+
 const emit = defineEmits<{
-  select: [category: string];
+  select: [chip: FilterChip];
 }>();
 
-const categories = [
-  "All",
-  "Music",
-  "Podcasts",
-  "Gaming",
-  "Technology",
-  "Live",
-  "Anime",
-  "Lo-fi",
-  "News",
-  "Mixes",
-  "Recently uploaded",
-];
-
-const selectedCategory = ref("All");
-
-function select(cat: string) {
-  selectedCategory.value = cat;
-  emit("select", cat);
+function select(chip: FilterChip) {
+  emit("select", chip);
 }
 </script>
 
 <template>
-  <div class="sticky top-0 z-30 flex items-center gap-2 overflow-x-auto py-3 px-6 bg-background/80 backdrop-blur-sm no-scrollbar border-b border-border/20">
+  <div
+    v-if="chips.length > 0"
+    class="sticky top-0 z-30 flex items-center gap-2 overflow-x-auto py-3 px-6 bg-background/80 backdrop-blur-sm no-scrollbar border-b border-border/20"
+  >
     <button
-      v-for="cat in categories"
-      :key="cat"
+      v-for="chip in chips"
+      :key="chip.text"
       type="button"
       :class="[
         'whitespace-nowrap rounded-lg px-3.5 py-1.5 text-xs font-medium transition-colors cursor-pointer',
-        selectedCategory === cat
+        selected === chip.text
           ? 'bg-foreground text-background shadow-xs'
-          : 'bg-muted/60 text-foreground/80 hover:bg-muted'
+          : 'bg-muted/60 text-foreground/80 hover:bg-muted',
       ]"
-      @click="select(cat)"
+      @click="select(chip)"
     >
-      {{ cat }}
+      {{ chip.text }}
     </button>
   </div>
 </template>

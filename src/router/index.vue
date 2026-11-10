@@ -1,41 +1,40 @@
 <script setup lang="ts">
-import { commands } from "@/bindings";
-import type { VideoItem } from "@/components/video/VideoCard.vue";
+import { ref } from "vue";
+import type { FilterChip } from "@/bindings";
 
-const isLoading = ref(false);
-const continuation = ref<string | null>(null);
-const video = ref<VideoItem[] | null>(null);
+const filterChips = ref<FilterChip[]>([]);
+const currentCategoryParams = ref<string | null>(null);
+const selectedCategoryText = ref("All");
 
-async function get_homefeed() {
-  try {
-    isLoading.value = true;
-    const res = await commands.getHomeFeed(continuation.value);
-    if (res.status === "ok") {
-      video.value = res.data.videos;
-      console.log(res.data);
-      continuation.value = res.data.continuationToken;
-    }
-  } catch (_) {
-  } finally {
-    isLoading.value = false;
-  }
+function onCategorySelect(chip: FilterChip) {
+  currentCategoryParams.value = chip.params ?? null;
+  selectedCategoryText.value = chip.text;
 }
 
-onMounted(() => {
-  get_homefeed();
-});
+function onUpdateChips(chips: FilterChip[]) {
+  filterChips.value = chips;
 
-function onCategorySelect(category: string) {
-  console.log("Selected category:", category);
+  const active = chips.find((c) => c.isSelected);
+  if (active && currentCategoryParams.value === null) {
+    selectedCategoryText.value = active.text;
+  }
 }
 </script>
 
 <template>
-  <div class="flex flex-col min-h-full">
-    <!-- Category Filter Chips -->
-    <CategoryChips @select="onCategorySelect" />
+  <div class="flex flex-col min-h-full relative">
+    <CategoryChips
+      :chips="filterChips"
+      :selected="selectedCategoryText"
+      @select="onCategorySelect"
+    />
 
-    <!-- Video Grid Section -->
-    <!-- <VideoGrid :videos="mockVideos" :loading="isLoading" /> -->
+    <KeepAlive>
+      <VideoFeed
+        :key="currentCategoryParams ?? 'all'"
+        :category-params="currentCategoryParams"
+        @update-chips="onUpdateChips"
+      />
+    </KeepAlive>
   </div>
 </template>

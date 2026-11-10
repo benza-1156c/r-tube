@@ -1,17 +1,6 @@
 <script setup lang="ts">
+import { VideoItem } from "@/bindings";
 import { CheckCircle2, Play } from "@lucide/vue";
-
-export interface VideoItem {
-  id: string;
-  title: string;
-  thumbnailUrl: string;
-  duration: string;
-  channelName: string;
-  channelAvatarUrl: string;
-  isVerified?: boolean;
-  views: string;
-  publishedAt: string;
-}
 
 const props = defineProps<{
   video: VideoItem;
@@ -30,7 +19,9 @@ function openVideo() {
     @click="openVideo"
   >
     <!-- Thumbnail Container -->
-    <div class="relative aspect-video w-full overflow-hidden rounded-xl bg-muted shadow-xs">
+    <div
+      class="relative aspect-video w-full overflow-hidden rounded-xl bg-muted shadow-xs"
+    >
       <img
         :src="video.thumbnailUrl"
         :alt="video.title"
@@ -42,7 +33,9 @@ function openVideo() {
       <div
         class="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 transition-opacity duration-200 group-hover:opacity-100"
       >
-        <div class="flex h-11 w-11 items-center justify-center rounded-full bg-black/60 backdrop-blur-xs text-white">
+        <div
+          class="flex h-11 w-11 items-center justify-center rounded-full bg-black/60 backdrop-blur-xs text-white"
+        >
           <Play class="h-5 w-5 fill-white translate-x-0.5" />
         </div>
       </div>
@@ -77,7 +70,9 @@ function openVideo() {
         </h3>
 
         <div class="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-          <span class="hover:text-foreground truncate">{{ video.channelName }}</span>
+          <span class="hover:text-foreground truncate">{{
+            video.channelName
+          }}</span>
           <CheckCircle2
             v-if="video.isVerified"
             class="h-3 w-3 shrink-0 text-muted-foreground fill-muted-foreground/30"
@@ -85,7 +80,7 @@ function openVideo() {
         </div>
 
         <div class="flex items-center gap-1 text-xs text-muted-foreground/80">
-          <span>{{ video.views }}</span>
+          <span>{{ video.viewCount }}</span>
           <span>•</span>
           <span>{{ video.publishedAt }}</span>
         </div>
@@ -93,4 +88,3 @@ function openVideo() {
     </div>
   </div>
 </template>
-

@@ -65,13 +65,6 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
-    '/watch/': RouteRecordInfo<
-      '/watch/',
-      '/watch',
-      Record<never, never>,
-      Record<never, never>,
-      | never
-    >,
     '/watch/[id]': RouteRecordInfo<
       '/watch/[id]',
       '/watch/:id',
@@ -125,12 +118,6 @@ declare module 'vue-router/auto-routes' {
     'src/router/trending/index.vue': {
       routes:
         | '/trending/'
-      views:
-        | never
-    }
-    'src/router/watch/index.vue': {
-      routes:
-        | '/watch/'
       views:
         | never
     }

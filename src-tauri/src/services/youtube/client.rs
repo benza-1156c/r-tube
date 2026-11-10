@@ -120,10 +120,12 @@ impl YoutubeClient {
     pub async fn get_home_feed(
         &self,
         continuation_token: Option<&str>,
+        params: Option<&str>,
     ) -> Result<HomeFeed, AppError> {
         let yt = self.innertube.read().await;
-        if let Some(token) = continuation_token {
-            yt.get_home_feed_continuation(token).await.map_err(|e| {
+        let token = continuation_token.or(params);
+        if let Some(t) = token {
+            yt.get_home_feed_continuation(t).await.map_err(|e| {
                 AppError::Internal(format!("Failed to fetch home feed continuation: {e}"))
             })
         } else {
@@ -370,3 +372,4 @@ impl YoutubeClient {
         })
     }
 }
+
