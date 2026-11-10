@@ -19,6 +19,7 @@ export const commands = {
 	getVideoInfo: (videoId: string) => typedError<PlayerResponse_Serialize, AppError_Serialize>(__TAURI_INVOKE("get_video_info", { videoId })),
 	getWatchNext: (videoId: string) => typedError<WatchNextResults_Serialize, AppError_Serialize>(__TAURI_INVOKE("get_watch_next", { videoId })),
 	getAccountInfo: () => typedError<CurrentUserProfile_Serialize, AppError_Serialize>(__TAURI_INVOKE("get_account_info")),
+	getSubtitleContent: (url: string) => typedError<string, AppError_Serialize>(__TAURI_INVOKE("get_subtitle_content", { url })),
 };
 
 /* Types */
@@ -27,6 +28,12 @@ export type AppError = AppError_Serialize | AppError_Deserialize;
 export type AppError_Deserialize = { type: "Database"; message: string } | { type: "NotFound"; message: string } | { type: "Validation"; message: string } | { type: "Internal"; message: string };
 
 export type AppError_Serialize = { type: "Database"; message: string } | { type: "NotFound"; message: string } | { type: "Validation"; message: string } | { type: "Internal"; message: string };
+
+export type AudioTrackInfo = {
+	id: string,
+	displayName: string,
+	isDefault: boolean,
+};
 
 export type BrowseFeed = BrowseFeed_Serialize | BrowseFeed_Deserialize;
 
@@ -42,6 +49,12 @@ export type BrowseFeed_Serialize = {
 	videos: VideoItem_Serialize[],
 	playlists: PlaylistItem_Serialize[],
 	continuationToken: string | null,
+};
+
+export type CaptionTrack = {
+	languageCode: string,
+	name: string,
+	vttUrl: string,
 };
 
 export type CurrentUserProfile = CurrentUserProfile_Serialize | CurrentUserProfile_Deserialize;
@@ -117,6 +130,7 @@ export type PlayerResponse_Deserialize = {
 	adaptiveFormats: VideoStreamFormat_Deserialize[],
 	hlsManifestUrl?: string | null,
 	dashManifestUrl?: string | null,
+	captions: CaptionTrack[],
 };
 
 export type PlayerResponse_Serialize = {
@@ -133,6 +147,7 @@ export type PlayerResponse_Serialize = {
 	adaptiveFormats: VideoStreamFormat_Serialize[],
 	hlsManifestUrl: string | null,
 	dashManifestUrl: string | null,
+	captions: CaptionTrack[],
 };
 
 export type PlaylistItem = PlaylistItem_Serialize | PlaylistItem_Deserialize;
@@ -233,6 +248,7 @@ export type VideoStreamFormat_Deserialize = {
 	height?: number | null,
 	isAudio: boolean,
 	isVideo: boolean,
+	audioTrack?: AudioTrackInfo | null,
 };
 
 export type VideoStreamFormat_Serialize = {
@@ -245,6 +261,7 @@ export type VideoStreamFormat_Serialize = {
 	height: number | null,
 	isAudio: boolean,
 	isVideo: boolean,
+	audioTrack: AudioTrackInfo | null,
 };
 
 export type WatchNextResults = WatchNextResults_Serialize | WatchNextResults_Deserialize;

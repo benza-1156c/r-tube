@@ -1,6 +1,5 @@
 use innertube_rs::{
-    BrowseFeed, HomeFeed, Innertube, PlayerResponse, SearchResults, SessionOptions, TrendingFeed,
-    WatchNextResults,
+    BrowseFeed, HomeFeed, Innertube, SearchResults, SessionOptions, TrendingFeed, WatchNextResults,
 };
 use reqwest::header::HeaderMap;
 use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter};
@@ -12,6 +11,7 @@ use tokio::sync::RwLock;
 
 use crate::db::entities::profile;
 use crate::error::AppError;
+use crate::models::youtube::{CaptionTrack, PlayerResponse};
 use crate::services::youtube::cookie::CookieManager;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
@@ -25,6 +25,7 @@ pub struct CurrentUserProfile {
 #[derive(Clone)]
 pub struct YoutubeClient {
     innertube: Arc<RwLock<Innertube>>,
+    anon_innertube: Arc<Innertube>,
     pub cookie_manager: CookieManager,
     active_profile_id: Arc<RwLock<Option<i32>>>,
 }
@@ -32,12 +33,18 @@ pub struct YoutubeClient {
 impl YoutubeClient {
     /// Create a new YoutubeClient instance with default anonymous session
     pub async fn new() -> Result<Self, AppError> {
+        let _ = crate::utils::proxy::init_stream_proxy().await;
+
         let innertube = Innertube::new()
             .await
             .map_err(|e| AppError::Internal(format!("Failed to initialize InnerTube: {e}")))?;
+        let anon_innertube = Innertube::new()
+            .await
+            .map_err(|e| AppError::Internal(format!("Failed to initialize Anon InnerTube: {e}")))?;
 
         Ok(Self {
             innertube: Arc::new(RwLock::new(innertube)),
+            anon_innertube: Arc::new(anon_innertube),
             cookie_manager: CookieManager::new(None),
             active_profile_id: Arc::new(RwLock::new(None)),
         })
@@ -163,12 +170,64 @@ impl YoutubeClient {
             .map_err(|e| AppError::Internal(format!("YouTube search failed: {e}")))
     }
 
-    /// Get video information and player response
+    /// Get video information and player response with deciphered stream URLs
     pub async fn get_video_info(&self, video_id: &str) -> Result<PlayerResponse, AppError> {
-        let yt = self.innertube.read().await;
-        yt.get_video_info(video_id)
-            .await
-            .map_err(|e| AppError::Internal(format!("Failed to get video info: {e}")))
+        // 1. Fetch raw player response using ANDROID_VR client directly to avoid c=IOS fallback
+        let opt = innertube_rs::models::video::GetVideoInfoOptions {
+            client: Some("ANDROID_VR".to_string()),
+            po_token: None,
+            ..Default::default()
+        };
+
+        let mut raw_player_res = match innertube_rs::endpoints::player::fetch_player_response_with_options(
+            &self.anon_innertube.session,
+            video_id,
+            Some(self.anon_innertube.player.decipherer.signature_timestamp),
+            Some(&opt),
+        ).await {
+            Ok(res) if res.streaming_data.is_some() => res,
+            _ => {
+                // Fallback to cookie-bearing session for age-restricted/private videos
+                let yt = self.innertube.read().await;
+                yt.get_video_info(video_id)
+                    .await
+                    .map_err(|e| AppError::Internal(format!("Failed to get video info: {e}")))?
+            }
+        };
+
+        // 2. Decipher stream URLs (signature + n-parameter) for all formats and wrap with local proxy
+        if let Some(ref mut sd) = raw_player_res.streaming_data {
+            let mut nsig_cache = innertube_rs::utils::decipher::NsigCache::new();
+            for format in sd.formats.iter_mut().chain(sd.adaptive_formats.iter_mut()) {
+                if let Ok(resolved_url) = innertube_rs::endpoints::player::resolve_stream_url_full(
+                    format,
+                    &self.anon_innertube.player.decipherer,
+                    self.anon_innertube.session.po_token.as_deref(),
+                    Some(&mut nsig_cache),
+                ) {
+                    format.url = Some(crate::utils::proxy::wrap_stream_url(&resolved_url));
+                    format.signature_cipher = None;
+                    format.cipher = None;
+                } else if let Some(ref u) = format.url {
+                    format.url = Some(crate::utils::proxy::wrap_stream_url(u));
+                }
+            }
+        }
+        let mut player_res = PlayerResponse::from(raw_player_res);
+
+        // Fetch captions/transcripts if available
+        if let Ok(tracks) = self.anon_innertube.get_transcript_tracks(video_id).await {
+            player_res.captions = tracks
+                .into_iter()
+                .map(|t| CaptionTrack {
+                    language_code: t.language_code,
+                    name: t.name,
+                    vtt_url: format!("{}&fmt=vtt", t.base_url),
+                })
+                .collect();
+        }
+
+        Ok(player_res)
     }
 
     /// Get watch next details (related videos and playlist context)
@@ -334,12 +393,6 @@ impl YoutubeClient {
                 .await
             {
                 scan_profile(&list_raw, &mut name, &mut email, &mut photo, &mut handle);
-                if email.is_none() {
-                    println!(
-                        "[Debug] /account/accounts_list JSON: {}",
-                        serde_json::to_string(&list_raw).unwrap_or_default()
-                    );
-                }
             }
         }
 
@@ -373,3 +426,37 @@ impl YoutubeClient {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_get_video_info_decipher() {
+        let client = YoutubeClient::new().await.expect("Failed to create client");
+        let res = client
+            .get_video_info("3ryID_SwU5E")
+            .await
+            .expect("Failed to get video info");
+        let sample = res
+            .formats
+            .iter()
+            .chain(res.adaptive_formats.iter())
+            .find(|f| f.url.is_some())
+            .expect("Expected at least 1 playable resolved URL");
+
+        let url = sample.url.as_ref().unwrap();
+        println!("PROXY URL: {}", url);
+        assert!(url.starts_with("http://127.0.0.1:"), "URL should be wrapped by local proxy");
+
+        // Test requesting from local proxy
+        let http_client = reqwest::Client::new();
+        let resp = http_client
+            .get(url)
+            .header("Range", "bytes=0-100")
+            .send()
+            .await
+            .expect("Failed to fetch from proxy");
+        println!("PROXY STATUS: {}", resp.status());
+        assert_eq!(resp.status(), 206, "Local proxy should return 206 Partial Content");
+    }
+}

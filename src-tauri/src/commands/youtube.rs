@@ -49,8 +49,7 @@ pub async fn get_video_info(
     state: State<'_, AppState>,
     video_id: String,
 ) -> Result<PlayerResponse, AppError> {
-    let info = state.yt.get_video_info(&video_id).await?;
-    Ok(info.into())
+    state.yt.get_video_info(&video_id).await
 }
 
 #[app_command]
@@ -65,4 +64,23 @@ pub async fn get_watch_next(
 #[app_command]
 pub async fn get_account_info(state: State<'_, AppState>) -> Result<CurrentUserProfile, AppError> {
     state.yt.get_account_info().await
+}
+
+#[app_command]
+pub async fn get_subtitle_content(url: String) -> Result<String, AppError> {
+    let client = reqwest::Client::new();
+    let res = client
+        .get(&url)
+        .header(
+            "User-Agent",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        )
+        .send()
+        .await
+        .map_err(|e| AppError::Internal(format!("Failed to fetch subtitle: {e}")))?;
+    let text = res
+        .text()
+        .await
+        .map_err(|e| AppError::Internal(format!("Failed to read subtitle text: {e}")))?;
+    Ok(text)
 }

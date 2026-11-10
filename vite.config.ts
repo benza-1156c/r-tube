@@ -23,7 +23,13 @@ export default defineConfig(() => ({
         }
       },
     }),
-    vue(),
+    vue({
+      template: {
+        compilerOptions: {
+          isCustomElement: (tag) => tag === "video-player" || tag === "video-skin",
+        },
+      },
+    }),
     tailwindcss(),
     AutoImport({
       imports: [

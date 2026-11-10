@@ -77,6 +77,22 @@ pub struct SearchResults {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
+pub struct AudioTrackInfo {
+    pub id: String,
+    pub display_name: String,
+    pub is_default: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct CaptionTrack {
+    pub language_code: String,
+    pub name: String,
+    pub vtt_url: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
 pub struct VideoStreamFormat {
     pub itag: u32,
     pub mime_type: String,
@@ -87,6 +103,7 @@ pub struct VideoStreamFormat {
     pub height: Option<u32>,
     pub is_audio: bool,
     pub is_video: bool,
+    pub audio_track: Option<AudioTrackInfo>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
@@ -105,6 +122,7 @@ pub struct PlayerResponse {
     pub adaptive_formats: Vec<VideoStreamFormat>,
     pub hls_manifest_url: Option<String>,
     pub dash_manifest_url: Option<String>,
+    pub captions: Vec<CaptionTrack>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
@@ -336,6 +354,11 @@ impl From<innertube_rs::SearchResults> for SearchResults {
 
 impl From<&innertube_rs::StreamingFormat> for VideoStreamFormat {
     fn from(f: &innertube_rs::StreamingFormat) -> Self {
+        let is_audio = f.mime_type.starts_with("audio/")
+            || f.audio_track.is_some()
+            || f.mime_type.contains("mp4a")
+            || f.mime_type.contains("opus");
+        let is_video = f.mime_type.starts_with("video/");
         Self {
             itag: f.itag,
             mime_type: f.mime_type.clone(),
@@ -344,8 +367,13 @@ impl From<&innertube_rs::StreamingFormat> for VideoStreamFormat {
             url: f.url.clone(),
             width: f.width,
             height: f.height,
-            is_audio: f.mime_type.starts_with("audio/"),
-            is_video: f.mime_type.starts_with("video/"),
+            is_audio,
+            is_video,
+            audio_track: f.audio_track.as_ref().map(|t| AudioTrackInfo {
+                id: t.id.clone(),
+                display_name: t.display_name.clone(),
+                is_default: t.audio_is_default,
+            }),
         }
     }
 }
@@ -427,6 +455,7 @@ impl From<innertube_rs::PlayerResponse> for PlayerResponse {
             adaptive_formats,
             hls_manifest_url,
             dash_manifest_url,
+            captions: Vec::new(),
         }
     }
 }

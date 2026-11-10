@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useRoute } from "vue-router";
 import { computed } from "vue";
+import GlobalVideoPlayer from "@/components/player/GlobalVideoPlayer.vue";
 
 const route = useRoute();
 
@@ -26,5 +27,15 @@ const shouldHideHeader = computed(() => Boolean(route.meta.hideHeader));
         </router-view>
       </main>
     </SidebarInset>
+
+    <!-- Persistent Mini Player Host (docked at bottom right) -->
+    <div
+      id="mini-player-host"
+      class="fixed bottom-4 right-4 z-50 pointer-events-none"
+    >
+      <div class="pointer-events-auto">
+        <GlobalVideoPlayer />
+      </div>
+    </div>
   </SidebarProvider>
 </template>

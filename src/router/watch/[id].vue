@@ -1,56 +1,97 @@
 <script setup lang="ts">
+import { ref, computed, onMounted, onUnmounted, watch } from "vue";
+import { useRoute, useRouter, onBeforeRouteLeave } from "vue-router";
+import { usePlayer } from "@/composables/usePlayer";
+import { commands, type VideoItem_Deserialize, type WatchNextResults_Deserialize } from "@/bindings";
 import {
   ArrowLeft,
   ThumbsUp,
   Share2,
   Bookmark,
   CheckCircle2,
-  Play,
+  Loader2,
+  ListMusic,
+  ChevronDown,
+  ChevronUp,
 } from "@lucide/vue";
 
 defineOptions({ name: "WatchPage" });
 
 const route = useRoute();
 const router = useRouter();
-const videoId = (route.params as Record<string, any>)?.id || "dQw4w9WgXcQ";
+const player = usePlayer();
+
+const videoId = computed(() => (route.params as Record<string, any>)?.id as string || "");
 const playlistId = computed(() => (route.query as Record<string, any>)?.list as string | undefined);
 
-const relatedVideos = [
-  {
-    id: "kJQP7kiw5Fk",
-    title: "Lofi Hip Hop Radio - Beats to Relax/Study to",
-    thumbnailUrl:
-      "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=400&auto=format&fit=crop&q=60",
-    channelName: "ChillHop Music",
-    views: "4.8K watching",
-    duration: "LIVE",
-  },
-  {
-    id: "fJ9rUzIMcZQ",
-    title:
-      "Understanding YouTube InnerTube Protocol and Session Tokens in Depth",
-    thumbnailUrl:
-      "https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=400&auto=format&fit=crop&q=60",
-    channelName: "System Architecture",
-    views: "89K views",
-    duration: "25:10",
-  },
-  {
-    id: "7wtfhZwyrcc",
-    title: "Top 10 VS Code & NeoVim Productivity Shortcuts You Never Knew",
-    thumbnailUrl:
-      "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=400&auto=format&fit=crop&q=60",
-    channelName: "DevTips Daily",
-    views: "310K views",
-    duration: "12:15",
-  },
-];
+const watchNext = ref<WatchNextResults_Deserialize | null>(null);
+const isLoadingRelated = ref(false);
+const isDescriptionExpanded = ref(false);
+const watchSlotRef = ref<HTMLDivElement | null>(null);
+
+async function loadWatchData(id: string) {
+  if (!id) return;
+
+  // Load video stream in global player
+  player.loadVideo(id);
+
+  // Fetch Watch Next results (related videos & playlist context)
+  isLoadingRelated.value = true;
+  try {
+    const res = await commands.getWatchNext(id);
+    if (res.status === "ok") {
+      watchNext.value = res.data;
+    }
+  } catch (err) {
+    console.warn("Failed to load watch next details:", err);
+  } finally {
+    isLoadingRelated.value = false;
+  }
+}
+
+onMounted(() => {
+  if (watchSlotRef.value) {
+    player.setWatchAnchor(watchSlotRef.value);
+  }
+  if (videoId.value) {
+    loadWatchData(videoId.value);
+  }
+});
+
+onBeforeRouteLeave(() => {
+  player.setWatchAnchor(null);
+});
+
+onUnmounted(() => {
+  player.setWatchAnchor(null);
+});
+
+// React to route ID changes (e.g. clicking related video)
+watch(
+  () => videoId.value,
+  (newId) => {
+    if (newId && newId !== player.currentVideo.value?.id) {
+      loadWatchData(newId);
+    }
+  }
+);
+
+function selectRelatedVideo(item: VideoItem_Deserialize) {
+  if (item.playlistId) {
+    router.push({
+      path: `/watch/${item.id}`,
+      query: { list: item.playlistId },
+    });
+  } else {
+    router.push(`/watch/${item.id}`);
+  }
+}
 </script>
 
 <template>
   <div class="flex flex-col lg:flex-row gap-6 p-6 max-w-7xl mx-auto">
-    <!-- Left Column: Video Player & Details -->
-    <div class="flex-1 flex flex-col gap-4">
+    <!-- Left Column: Video Player & Metadata -->
+    <div class="flex-1 flex flex-col gap-4 min-w-0">
       <!-- Back Navigation Header -->
       <div class="flex items-center gap-3">
         <Button
@@ -60,59 +101,68 @@ const relatedVideos = [
           @click="router.push('/')"
         >
           <ArrowLeft class="h-4 w-4" />
-          <span>Back to Home (Show Sidebar)</span>
+          <span>Back to Home</span>
         </Button>
 
         <span
-          class="text-xs px-2.5 py-1 rounded-full bg-primary/10 text-primary font-medium"
+          v-if="playlistId"
+          class="text-xs px-2.5 py-1 rounded-full bg-primary/10 text-primary font-medium flex items-center gap-1"
         >
-          Sidebar is hidden here via meta: { hideSidebar: true }
+          <ListMusic class="h-3.5 w-3.5" />
+          Playlist Mode
         </span>
       </div>
 
-      <!-- Video Player Frame Placeholder -->
+      <!-- VIDEO PLAYER ANCHOR SLOT (GlobalVideoPlayer docks here) -->
       <div
-        class="relative aspect-video w-full rounded-2xl overflow-hidden bg-black shadow-lg flex items-center justify-center"
+        id="watch-player-slot"
+        ref="watchSlotRef"
+        class="relative aspect-video w-full rounded-2xl overflow-hidden bg-black shadow-xl"
       >
-        <div class="flex flex-col items-center gap-3 text-white">
-          <div
-            class="flex h-16 w-16 items-center justify-center rounded-full bg-red-600 shadow-md"
-          >
-            <Play class="h-8 w-8 fill-white translate-x-0.5" />
-          </div>
-          <p class="text-sm font-medium text-white/80 text-center">
-            Playing Video ID: {{ videoId }}
-            <span v-if="playlistId" class="block text-xs text-white/60 mt-1">Playlist: {{ playlistId }}</span>
-          </p>
+        <!-- Fallback loader before player teleports -->
+        <div
+          v-if="player.status.value === 'loading'"
+          class="w-full h-full flex flex-col items-center justify-center gap-3 text-white"
+        >
+          <Loader2 class="h-10 w-10 text-primary animate-spin" />
+          <p class="text-xs text-white/70">Loading stream...</p>
         </div>
       </div>
 
       <!-- Video Title -->
-      <h1 class="text-xl font-bold text-foreground">
-        Building Modern Desktop Apps with Tauri 2.0, Rust, and Vue 3
+      <h1 class="text-xl font-bold text-foreground leading-snug">
+        {{ player.currentVideo.value?.title || watchNext?.currentTitle || "Loading video..." }}
       </h1>
 
       <!-- Channel & Action Buttons Row -->
       <div
         class="flex flex-wrap items-center justify-between gap-4 border-b border-border/40 pb-4"
       >
+        <!-- Channel Info -->
         <div class="flex items-center gap-3">
           <img
-            src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=60"
-            alt="Channel Avatar"
-            class="h-10 w-10 rounded-full object-cover"
+            v-if="player.currentVideo.value?.channelAvatarUrl"
+            :src="player.currentVideo.value.channelAvatarUrl"
+            :alt="player.currentVideo.value?.channelName"
+            class="h-10 w-10 rounded-full object-cover ring-1 ring-border"
           />
-          <div>
-            <div
-              class="flex items-center gap-1 font-semibold text-sm text-foreground"
-            >
-              <span>Rust & Web Studio</span>
-              <CheckCircle2
-                class="h-3.5 w-3.5 text-muted-foreground fill-muted-foreground/30"
-              />
-            </div>
-            <p class="text-xs text-muted-foreground">240K subscribers</p>
+          <div
+            v-else
+            class="h-10 w-10 rounded-full bg-muted flex items-center justify-center font-bold text-sm text-muted-foreground ring-1 ring-border uppercase"
+          >
+            {{ (player.currentVideo.value?.channelName || watchNext?.currentAuthor || "Y").charAt(0) }}
           </div>
+
+          <div>
+            <div class="flex items-center gap-1 font-semibold text-sm text-foreground">
+              <span>{{ player.currentVideo.value?.channelName || watchNext?.currentAuthor || "Channel" }}</span>
+              <CheckCircle2 class="h-3.5 w-3.5 text-muted-foreground fill-muted-foreground/30" />
+            </div>
+            <p v-if="player.currentVideo.value?.viewCount" class="text-xs text-muted-foreground">
+              {{ player.currentVideo.value.viewCount }}
+            </p>
+          </div>
+
           <Button
             class="ml-3 rounded-full bg-foreground text-background hover:bg-foreground/90 font-medium px-4 h-9 text-xs"
           >
@@ -120,28 +170,17 @@ const relatedVideos = [
           </Button>
         </div>
 
+        <!-- Action Buttons -->
         <div class="flex items-center gap-2">
-          <Button
-            variant="secondary"
-            size="sm"
-            class="rounded-full gap-1.5 h-9"
-          >
+          <Button variant="secondary" size="sm" class="rounded-full gap-1.5 h-9">
             <ThumbsUp class="h-4 w-4" />
-            <span>12K</span>
+            <span>Like</span>
           </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            class="rounded-full gap-1.5 h-9"
-          >
+          <Button variant="secondary" size="sm" class="rounded-full gap-1.5 h-9">
             <Share2 class="h-4 w-4" />
             <span>Share</span>
           </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            class="rounded-full gap-1.5 h-9"
-          >
+          <Button variant="secondary" size="sm" class="rounded-full gap-1.5 h-9">
             <Bookmark class="h-4 w-4" />
             <span>Save</span>
           </Button>
@@ -150,56 +189,91 @@ const relatedVideos = [
 
       <!-- Description Box -->
       <div
-        class="rounded-xl bg-muted/40 p-4 text-sm leading-relaxed text-foreground/90"
+        class="rounded-xl bg-muted/40 p-4 text-sm leading-relaxed text-foreground/90 transition-all"
       >
         <div
-          class="font-semibold mb-1 flex items-center gap-2 text-xs text-muted-foreground"
+          v-if="player.currentVideo.value?.viewCount"
+          class="font-semibold mb-2 flex items-center gap-2 text-xs text-muted-foreground"
         >
-          <span>142,390 views</span>
-          <span>•</span>
-          <span>2 days ago</span>
+          <span>{{ player.currentVideo.value.viewCount }}</span>
         </div>
-        <p>
-          Learn how to build production-grade desktop applications with Tauri
-          v2, Vue 3, SQLite (SeaORM), and the YouTube InnerTube API for video
-          streaming and playlist management.
+
+        <p
+          class="whitespace-pre-line text-xs text-foreground/80"
+          :class="{ 'line-clamp-3': !isDescriptionExpanded }"
+        >
+          {{ player.currentVideo.value?.description || "No description provided." }}
         </p>
+
+        <button
+          v-if="(player.currentVideo.value?.description?.length || 0) > 150"
+          class="mt-2 text-xs font-semibold text-foreground hover:text-primary flex items-center gap-1 transition-colors"
+          @click="isDescriptionExpanded = !isDescriptionExpanded"
+        >
+          <span>{{ isDescriptionExpanded ? "Show less" : "Show more" }}</span>
+          <ChevronUp v-if="isDescriptionExpanded" class="h-3.5 w-3.5" />
+          <ChevronDown v-else class="h-3.5 w-3.5" />
+        </button>
       </div>
     </div>
 
     <!-- Right Column: Up Next / Related Videos -->
-    <div class="w-full lg:w-96 flex flex-col gap-3">
-      <h2 class="font-semibold text-sm text-foreground">Up next</h2>
-      <div
-        v-for="item in relatedVideos"
-        :key="item.id"
-        class="flex gap-3 group cursor-pointer hover:bg-muted/40 p-2 rounded-xl transition-colors"
-        @click="router.push(`/watch/${item.id}`)"
-      >
+    <div class="w-full lg:w-96 flex flex-col gap-3 shrink-0">
+      <div class="flex items-center justify-between">
+        <h2 class="font-semibold text-sm text-foreground">Up next</h2>
+        <Loader2 v-if="isLoadingRelated" class="h-4 w-4 text-muted-foreground animate-spin" />
+      </div>
+
+      <!-- Related Videos List -->
+      <div class="flex flex-col gap-2.5">
         <div
-          class="relative aspect-video w-40 shrink-0 overflow-hidden rounded-lg bg-muted"
+          v-for="item in watchNext?.relatedVideos || []"
+          :key="item.id"
+          class="flex gap-3 group cursor-pointer hover:bg-muted/40 p-2 rounded-xl transition-colors"
+          @click="selectRelatedVideo(item)"
         >
-          <img
-            :src="item.thumbnailUrl"
-            :alt="item.title"
-            class="h-full w-full object-cover group-hover:scale-105 transition-transform"
-          />
-          <span
-            class="absolute bottom-1 right-1 rounded-sm bg-black/80 px-1 text-[10px] text-white"
+          <!-- Thumbnail -->
+          <div
+            class="relative aspect-video w-36 shrink-0 overflow-hidden rounded-lg bg-muted"
           >
-            {{ item.duration }}
-          </span>
-        </div>
-        <div class="flex flex-col min-w-0">
-          <h3
-            class="line-clamp-2 text-xs font-semibold leading-snug text-foreground group-hover:text-primary"
-          >
-            {{ item.title }}
-          </h3>
-          <p class="text-[11px] text-muted-foreground mt-1 truncate">
-            {{ item.channelName }}
-          </p>
-          <p class="text-[11px] text-muted-foreground/80">{{ item.views }}</p>
+            <img
+              :src="item.thumbnailUrl"
+              :alt="item.title"
+              class="h-full w-full object-cover group-hover:scale-105 transition-transform"
+              loading="lazy"
+            />
+            <span
+              v-if="item.duration"
+              class="absolute bottom-1 right-1 rounded-sm bg-black/80 px-1 text-[10px] text-white flex items-center gap-0.5"
+            >
+              <ListMusic
+                v-if="item.playlistId || item.duration === 'Mix'"
+                class="h-2.5 w-2.5"
+              />
+              {{ item.duration }}
+            </span>
+          </div>
+
+          <!-- Info -->
+          <div class="flex flex-col min-w-0 flex-1 justify-center">
+            <h3
+              class="line-clamp-2 text-xs font-semibold leading-snug text-foreground group-hover:text-primary transition-colors"
+              :title="item.title"
+            >
+              {{ item.title }}
+            </h3>
+            <p class="text-[11px] text-muted-foreground mt-1 truncate">
+              {{ item.channelName }}
+            </p>
+            <div
+              v-if="item.viewCount || item.publishedAt"
+              class="text-[10px] text-muted-foreground/80 flex items-center gap-1 mt-0.5"
+            >
+              <span v-if="item.viewCount">{{ item.viewCount }}</span>
+              <span v-if="item.viewCount && item.publishedAt">•</span>
+              <span v-if="item.publishedAt">{{ item.publishedAt }}</span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
