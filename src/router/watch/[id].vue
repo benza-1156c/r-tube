@@ -125,7 +125,7 @@ function selectRelatedVideo(item: VideoItem_Deserialize) {
       <div
         id="watch-player-slot"
         ref="watchSlotRef"
-        class="relative aspect-video w-full rounded-2xl overflow-hidden"
+        class="relative aspect-video w-full overflow-hidden rounded-(--rt-player-radius)"
       >
         <!-- Fallback loader before player teleports -->
         <div

@@ -28,14 +28,11 @@ const shouldHideHeader = computed(() => Boolean(route.meta.hideHeader));
       </main>
     </SidebarInset>
 
-    <!-- Persistent Mini Player Host (docked at bottom right) -->
     <div
       id="mini-player-host"
-      class="fixed bottom-4 right-4 z-50 pointer-events-none"
+      class="pointer-events-none fixed bottom-5 right-5 z-50 w-96 max-w-[calc(100vw-2.5rem)]"
     >
-      <div class="pointer-events-auto">
-        <GlobalVideoPlayer />
-      </div>
+      <GlobalVideoPlayer />
     </div>
   </SidebarProvider>
 </template>

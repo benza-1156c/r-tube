@@ -39,6 +39,9 @@ declare module 'vue' {
     DropdownMenuTrigger: typeof import('./../lib/components/ui/dropdown-menu/DropdownMenuTrigger.vue')['default']
     GlobalVideoPlayer: typeof import('./../components/player/GlobalVideoPlayer.vue')['default']
     Input: typeof import('./../lib/components/ui/input/Input.vue')['default']
+    MiniPlayerBar: typeof import('./../components/player/MiniPlayerBar.vue')['default']
+    PlayerQualityMenu: typeof import('./../components/player/PlayerQualityMenu.vue')['default']
+    PlayerSkin: typeof import('./../components/player/PlayerSkin.vue')['default']
     PlaylistCard: typeof import('./../components/video/PlaylistCard.vue')['default']
     Progress: typeof import('./../lib/components/ui/progress/Progress.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
@@ -87,5 +90,6 @@ declare module 'vue' {
     VideoCard: typeof import('./../components/video/VideoCard.vue')['default']
     VideoFeed: typeof import('./../components/video/VideoFeed.vue')['default']
     VideoGrid: typeof import('./../components/video/VideoGrid.vue')['default']
+    WatchPlayerChrome: typeof import('./../components/player/WatchPlayerChrome.vue')['default']
   }
 }
