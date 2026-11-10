@@ -109,14 +109,17 @@ Access-Control-Allow-Origin: *\r\n\
 Access-Control-Allow-Methods: GET, HEAD, OPTIONS\r\n\
 Access-Control-Allow-Headers: *\r\n\
 Access-Control-Max-Age: 86400\r\n\
+Connection: close\r\n\
 Content-Length: 0\r\n\r\n";
         stream.write_all(cors_resp.as_bytes()).await?;
+        let _ = stream.shutdown().await;
         return Ok(());
     }
 
     if method != "GET" && method != "HEAD" {
-        let err_resp = "HTTP/1.1 405 Method Not Allowed\r\nContent-Length: 0\r\n\r\n";
+        let err_resp = "HTTP/1.1 405 Method Not Allowed\r\nConnection: close\r\nContent-Length: 0\r\n\r\n";
         stream.write_all(err_resp.as_bytes()).await?;
+        let _ = stream.shutdown().await;
         return Ok(());
     }
 
@@ -132,8 +135,9 @@ Content-Length: 0\r\n\r\n";
     let target_url = match target_url {
         Some(u) if !u.is_empty() => u,
         _ => {
-            let err_resp = "HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\n\r\n";
+            let err_resp = "HTTP/1.1 400 Bad Request\r\nConnection: close\r\nContent-Length: 0\r\n\r\n";
             stream.write_all(err_resp.as_bytes()).await?;
+            let _ = stream.shutdown().await;
             return Ok(());
         }
     };
@@ -150,35 +154,12 @@ Content-Length: 0\r\n\r\n";
     }
 
     let build_request = || {
-        let is_android = target_url.contains("c=ANDROID_VR") || target_url.contains("c=ANDROID");
-        let is_ios = target_url.contains("c=IOS");
-        let is_mweb = target_url.contains("c=MWEB");
-
-        let ua = if is_android {
-            innertube_rs::constants::clients::ANDROID_VR_USER_AGENT
-        } else if is_ios {
-            innertube_rs::constants::clients::IOS_USER_AGENT
-        } else if is_mweb {
-            innertube_rs::constants::clients::MWEB_USER_AGENT
-        } else {
-            CHROME_USER_AGENT
-        };
-
-        let mut req = client.get(&target_url).header("User-Agent", ua);
-
-        // Native app clients (ANDROID_VR, IOS) must not send browser Origin/Referer headers
-        if is_mweb {
-            req = req
-                .header("Origin", "https://m.youtube.com")
-                .header("Referer", "https://m.youtube.com/")
-                .header("Accept-Language", ACCEPT_LANGUAGE);
-        } else if !is_android && !is_ios {
-            req = req
-                .header("Origin", YT_ORIGIN)
-                .header("Referer", YT_REFERER)
-                .header("Accept-Language", ACCEPT_LANGUAGE);
-        }
-
+        let mut req = client
+            .get(&target_url)
+            .header("User-Agent", CHROME_USER_AGENT)
+            .header("Referer", YT_REFERER)
+            .header("Origin", YT_ORIGIN)
+            .header("Accept-Language", ACCEPT_LANGUAGE);
         if let Some(range) = range_header.clone() {
             req = req.header("Range", range);
         }
@@ -190,11 +171,12 @@ Content-Length: 0\r\n\r\n";
         Err(e) => {
             let err_msg = e.to_string();
             let msg = format!(
-                "HTTP/1.1 502 Bad Gateway\r\nContent-Length: {}\r\n\r\n{}",
+                "HTTP/1.1 502 Bad Gateway\r\nConnection: close\r\nContent-Length: {}\r\n\r\n{}",
                 err_msg.len(),
                 err_msg
             );
             let _ = stream.write_all(msg.as_bytes()).await;
+            let _ = stream.shutdown().await;
             return Ok(());
         }
     };
@@ -208,7 +190,7 @@ Content-Length: 0\r\n\r\n";
 
     let status = resp.status();
     let mut head = format!(
-        "HTTP/1.1 {} {}\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Expose-Headers: Content-Length, Content-Range, Content-Type, Accept-Ranges\r\n",
+        "HTTP/1.1 {} {}\r\nConnection: close\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Expose-Headers: Content-Length, Content-Range, Content-Type, Accept-Ranges\r\n",
         status.as_u16(),
         status.canonical_reason().unwrap_or("OK")
     );
@@ -240,6 +222,7 @@ Content-Length: 0\r\n\r\n";
     stream.write_all(head.as_bytes()).await?;
 
     if method == "HEAD" {
+        let _ = stream.shutdown().await;
         return Ok(());
     }
 
@@ -254,48 +237,7 @@ Content-Length: 0\r\n\r\n";
             Err(_) => break,
         }
     }
+    let _ = stream.shutdown().await;
 
     Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    #[tokio::test]
-    async fn test_check_clients() {
-        let yt = innertube_rs::Innertube::new().await.unwrap();
-        let video_id = "e1bCibq2I1g";
-
-        let opt = innertube_rs::models::video::GetVideoInfoOptions {
-            client: Some("ANDROID_VR".to_string()),
-            po_token: None,
-            ..Default::default()
-        };
-        let mut res = innertube_rs::endpoints::player::fetch_player_response_with_options(
-            &yt.session,
-            video_id,
-            Some(yt.player.decipherer.signature_timestamp),
-            Some(&opt),
-        ).await.unwrap();
-
-        let sd = res.streaming_data.as_mut().unwrap();
-        let mut nsig_cache = innertube_rs::utils::decipher::NsigCache::new();
-
-        let f140 = sd.adaptive_formats.iter_mut().find(|f| f.itag == 140).unwrap();
-        let resolved_140 = innertube_rs::endpoints::player::resolve_stream_url_full(
-            f140,
-            &yt.player.decipherer,
-            None,
-            Some(&mut nsig_cache),
-        ).unwrap();
-        println!("Resolved 140 URL: {}", resolved_140);
-
-        let client = reqwest::Client::builder()
-            .user_agent(innertube_rs::constants::clients::ANDROID_VR_USER_AGENT)
-            .build()
-            .unwrap();
-
-        // Test unbounded Range
-        let resp_unbounded = client.get(&resolved_140).header("Range", "bytes=0-").send().await.unwrap();
-        println!("Unbounded Range bytes=0-: HTTP {}", resp_unbounded.status());
-    }
 }

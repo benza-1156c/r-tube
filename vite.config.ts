@@ -26,7 +26,11 @@ export default defineConfig(() => ({
     vue({
       template: {
         compilerOptions: {
-          isCustomElement: (tag) => tag === "video-player" || tag === "video-skin",
+          isCustomElement: (tag) =>
+            tag.startsWith("video-") ||
+            tag.startsWith("media-") ||
+            tag === "hlsjs-video" ||
+            tag === "dash-video",
         },
       },
     }),

@@ -2,7 +2,11 @@
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useRoute, useRouter, onBeforeRouteLeave } from "vue-router";
 import { usePlayer } from "@/composables/usePlayer";
-import { commands, type VideoItem_Deserialize, type WatchNextResults_Deserialize } from "@/bindings";
+import {
+  commands,
+  type VideoItem_Deserialize,
+  type WatchNextResults_Deserialize,
+} from "@/bindings";
 import {
   ArrowLeft,
   ThumbsUp,
@@ -21,8 +25,12 @@ const route = useRoute();
 const router = useRouter();
 const player = usePlayer();
 
-const videoId = computed(() => (route.params as Record<string, any>)?.id as string || "");
-const playlistId = computed(() => (route.query as Record<string, any>)?.list as string | undefined);
+const videoId = computed(
+  () => ((route.params as Record<string, any>)?.id as string) || "",
+);
+const playlistId = computed(
+  () => (route.query as Record<string, any>)?.list as string | undefined,
+);
 
 const watchNext = ref<WatchNextResults_Deserialize | null>(null);
 const isLoadingRelated = ref(false);
@@ -73,7 +81,7 @@ watch(
     if (newId && newId !== player.currentVideo.value?.id) {
       loadWatchData(newId);
     }
-  }
+  },
 );
 
 function selectRelatedVideo(item: VideoItem_Deserialize) {
@@ -117,7 +125,7 @@ function selectRelatedVideo(item: VideoItem_Deserialize) {
       <div
         id="watch-player-slot"
         ref="watchSlotRef"
-        class="relative aspect-video w-full rounded-2xl overflow-hidden bg-black shadow-xl"
+        class="relative aspect-video w-full rounded-2xl overflow-hidden"
       >
         <!-- Fallback loader before player teleports -->
         <div
@@ -131,7 +139,11 @@ function selectRelatedVideo(item: VideoItem_Deserialize) {
 
       <!-- Video Title -->
       <h1 class="text-xl font-bold text-foreground leading-snug">
-        {{ player.currentVideo.value?.title || watchNext?.currentTitle || "Loading video..." }}
+        {{
+          player.currentVideo.value?.title ||
+          watchNext?.currentTitle ||
+          "Loading video..."
+        }}
       </h1>
 
       <!-- Channel & Action Buttons Row -->
@@ -150,15 +162,32 @@ function selectRelatedVideo(item: VideoItem_Deserialize) {
             v-else
             class="h-10 w-10 rounded-full bg-muted flex items-center justify-center font-bold text-sm text-muted-foreground ring-1 ring-border uppercase"
           >
-            {{ (player.currentVideo.value?.channelName || watchNext?.currentAuthor || "Y").charAt(0) }}
+            {{
+              (
+                player.currentVideo.value?.channelName ||
+                watchNext?.currentAuthor ||
+                "Y"
+              ).charAt(0)
+            }}
           </div>
 
           <div>
-            <div class="flex items-center gap-1 font-semibold text-sm text-foreground">
-              <span>{{ player.currentVideo.value?.channelName || watchNext?.currentAuthor || "Channel" }}</span>
-              <CheckCircle2 class="h-3.5 w-3.5 text-muted-foreground fill-muted-foreground/30" />
+            <div
+              class="flex items-center gap-1 font-semibold text-sm text-foreground"
+            >
+              <span>{{
+                player.currentVideo.value?.channelName ||
+                watchNext?.currentAuthor ||
+                "Channel"
+              }}</span>
+              <CheckCircle2
+                class="h-3.5 w-3.5 text-muted-foreground fill-muted-foreground/30"
+              />
             </div>
-            <p v-if="player.currentVideo.value?.viewCount" class="text-xs text-muted-foreground">
+            <p
+              v-if="player.currentVideo.value?.viewCount"
+              class="text-xs text-muted-foreground"
+            >
               {{ player.currentVideo.value.viewCount }}
             </p>
           </div>
@@ -172,15 +201,27 @@ function selectRelatedVideo(item: VideoItem_Deserialize) {
 
         <!-- Action Buttons -->
         <div class="flex items-center gap-2">
-          <Button variant="secondary" size="sm" class="rounded-full gap-1.5 h-9">
+          <Button
+            variant="secondary"
+            size="sm"
+            class="rounded-full gap-1.5 h-9"
+          >
             <ThumbsUp class="h-4 w-4" />
             <span>Like</span>
           </Button>
-          <Button variant="secondary" size="sm" class="rounded-full gap-1.5 h-9">
+          <Button
+            variant="secondary"
+            size="sm"
+            class="rounded-full gap-1.5 h-9"
+          >
             <Share2 class="h-4 w-4" />
             <span>Share</span>
           </Button>
-          <Button variant="secondary" size="sm" class="rounded-full gap-1.5 h-9">
+          <Button
+            variant="secondary"
+            size="sm"
+            class="rounded-full gap-1.5 h-9"
+          >
             <Bookmark class="h-4 w-4" />
             <span>Save</span>
           </Button>
@@ -202,7 +243,9 @@ function selectRelatedVideo(item: VideoItem_Deserialize) {
           class="whitespace-pre-line text-xs text-foreground/80"
           :class="{ 'line-clamp-3': !isDescriptionExpanded }"
         >
-          {{ player.currentVideo.value?.description || "No description provided." }}
+          {{
+            player.currentVideo.value?.description || "No description provided."
+          }}
         </p>
 
         <button
@@ -221,7 +264,10 @@ function selectRelatedVideo(item: VideoItem_Deserialize) {
     <div class="w-full lg:w-96 flex flex-col gap-3 shrink-0">
       <div class="flex items-center justify-between">
         <h2 class="font-semibold text-sm text-foreground">Up next</h2>
-        <Loader2 v-if="isLoadingRelated" class="h-4 w-4 text-muted-foreground animate-spin" />
+        <Loader2
+          v-if="isLoadingRelated"
+          class="h-4 w-4 text-muted-foreground animate-spin"
+        />
       </div>
 
       <!-- Related Videos List -->

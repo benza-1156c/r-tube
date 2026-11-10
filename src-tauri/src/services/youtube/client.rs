@@ -172,37 +172,20 @@ impl YoutubeClient {
 
     /// Get video information and player response with deciphered stream URLs
     pub async fn get_video_info(&self, video_id: &str) -> Result<PlayerResponse, AppError> {
-        // 1. Fetch raw player response using ANDROID_VR client directly to avoid c=IOS fallback
-        let opt = innertube_rs::models::video::GetVideoInfoOptions {
-            client: Some("ANDROID_VR".to_string()),
-            po_token: None,
-            ..Default::default()
-        };
+        let yt = self.innertube.read().await;
+        let mut raw_player_res = yt
+            .get_video_info(video_id)
+            .await
+            .map_err(|e| AppError::Internal(format!("Failed to get video info: {e}")))?;
 
-        let mut raw_player_res = match innertube_rs::endpoints::player::fetch_player_response_with_options(
-            &self.anon_innertube.session,
-            video_id,
-            Some(self.anon_innertube.player.decipherer.signature_timestamp),
-            Some(&opt),
-        ).await {
-            Ok(res) if res.streaming_data.is_some() => res,
-            _ => {
-                // Fallback to cookie-bearing session for age-restricted/private videos
-                let yt = self.innertube.read().await;
-                yt.get_video_info(video_id)
-                    .await
-                    .map_err(|e| AppError::Internal(format!("Failed to get video info: {e}")))?
-            }
-        };
-
-        // 2. Decipher stream URLs (signature + n-parameter) for all formats and wrap with local proxy
+        // Decipher stream URLs (signature + n-parameter) for all formats and wrap with local proxy
         if let Some(ref mut sd) = raw_player_res.streaming_data {
             let mut nsig_cache = innertube_rs::utils::decipher::NsigCache::new();
             for format in sd.formats.iter_mut().chain(sd.adaptive_formats.iter_mut()) {
                 if let Ok(resolved_url) = innertube_rs::endpoints::player::resolve_stream_url_full(
                     format,
-                    &self.anon_innertube.player.decipherer,
-                    self.anon_innertube.session.po_token.as_deref(),
+                    &yt.player.decipherer,
+                    yt.session.po_token.as_deref(),
                     Some(&mut nsig_cache),
                 ) {
                     format.url = Some(crate::utils::proxy::wrap_stream_url(&resolved_url));

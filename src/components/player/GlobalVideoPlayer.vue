@@ -4,6 +4,13 @@ import { useRouter } from "vue-router";
 import { usePlayer, type QualityOption } from "@/composables/usePlayer";
 import "@videojs/html/video/player";
 import "@videojs/html/video/skin";
+import "@videojs/html/ui/menu";
+import "@videojs/html/ui/menu-content";
+import "@videojs/html/ui/menu-radio-item";
+import "@videojs/html/ui/menu-item-indicator";
+import "@videojs/html/ui/quality-radio-group";
+import "@videojs/html/media/dash-video";
+import "@videojs/html/media/hlsjs-video";
 import {
   Play,
   Pause,
@@ -98,18 +105,13 @@ const playerStyle = computed(() => {
   <div
     v-show="player.isOpen.value"
     id="global-player-root"
-    class="select-none overflow-hidden transition-[top,left,width,height] duration-200"
-    :class="[
-      isMini
-        ? 'rounded-2xl shadow-2xl border border-border/70 bg-card/95 backdrop-blur-md overflow-hidden'
-        : 'rounded-2xl shadow-xl bg-black overflow-hidden',
-    ]"
+    class="select-none rounded overflow-hidden transition-[top,left,width,height] duration-200"
     :style="playerStyle"
     @click="showQualityMenu = false"
   >
     <!-- VIDEO FRAME -->
     <div
-      class="relative w-full aspect-video bg-black flex items-center justify-center overflow-hidden"
+      class="relative w-full aspect-video flex items-center justify-center overflow-hidden"
       :class="{ 'mini-player-skin': isMini }"
     >
       <video-player
@@ -171,7 +173,7 @@ const playerStyle = computed(() => {
         <div v-if="player.availableQualities.value.length > 0" class="relative">
           <button
             class="px-2.5 py-1 rounded-full bg-black/60 hover:bg-black/80 text-white text-xs font-medium flex items-center gap-1.5 backdrop-blur-sm border border-white/20 transition-all shadow-md"
-            title="Change Resolution (สลับความละเอียด)"
+            title="Change Resolution"
             @click.stop="showQualityMenu = !showQualityMenu"
           >
             <Settings class="h-3.5 w-3.5" />
@@ -209,7 +211,7 @@ const playerStyle = computed(() => {
 
         <!-- Minimize to Mini Player Button -->
         <button
-          class="p-1.5 rounded-full bg-black/60 hover:bg-black/80 text-white transition-colors backdrop-blur-sm border border-white/20 shadow-md"
+          class="p-1.5 rounded bg-black/60 hover:bg-black/80 text-white transition-colors backdrop-blur-sm border border-white/20 shadow-md"
           title="Minimize to Mini Player (ย่อหน้าต่าง)"
           @click.stop="player.minimizeToMiniPlayer"
         >
@@ -220,7 +222,7 @@ const playerStyle = computed(() => {
       <!-- MINI-PLAYER HOVER OVERLAY (Shown only in Mini Player mode) -->
       <div
         v-if="isMini"
-        class="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 hover:opacity-100 transition-opacity duration-200 z-20 pointer-events-auto group"
+        class="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity duration-200 z-20 pointer-events-auto group"
         @click.stop
       >
         <button
