@@ -29,12 +29,6 @@ export type AppError_Deserialize = { type: "Database"; message: string } | { typ
 
 export type AppError_Serialize = { type: "Database"; message: string } | { type: "NotFound"; message: string } | { type: "Validation"; message: string } | { type: "Internal"; message: string };
 
-export type AudioTrackInfo = {
-	id: string,
-	displayName: string,
-	isDefault: boolean,
-};
-
 export type BrowseFeed = BrowseFeed_Serialize | BrowseFeed_Deserialize;
 
 export type BrowseFeed_Deserialize = {
@@ -126,10 +120,11 @@ export type PlayerResponse_Deserialize = {
 	viewCount: string,
 	isLive: boolean,
 	thumbnailUrl: string,
-	formats: VideoStreamFormat_Deserialize[],
-	adaptiveFormats: VideoStreamFormat_Deserialize[],
+	/**
+	 *  Proxied HLS master playlist. The only playback source the player uses:
+	 *  HLS serves one URL per segment, which is what makes seeking work.
+	 */
 	hlsManifestUrl?: string | null,
-	dashManifestUrl?: string | null,
 	captions: CaptionTrack[],
 };
 
@@ -143,10 +138,11 @@ export type PlayerResponse_Serialize = {
 	viewCount: string,
 	isLive: boolean,
 	thumbnailUrl: string,
-	formats: VideoStreamFormat_Serialize[],
-	adaptiveFormats: VideoStreamFormat_Serialize[],
+	/**
+	 *  Proxied HLS master playlist. The only playback source the player uses:
+	 *  HLS serves one URL per segment, which is what makes seeking work.
+	 */
 	hlsManifestUrl: string | null,
-	dashManifestUrl: string | null,
 	captions: CaptionTrack[],
 };
 
@@ -234,34 +230,6 @@ export type VideoItem_Serialize = {
 	viewCount: string,
 	publishedAt: string,
 	playlistId: string | null,
-};
-
-export type VideoStreamFormat = VideoStreamFormat_Serialize | VideoStreamFormat_Deserialize;
-
-export type VideoStreamFormat_Deserialize = {
-	itag: number,
-	mimeType: string,
-	qualityLabel?: string | null,
-	bitrate: number,
-	url?: string | null,
-	width?: number | null,
-	height?: number | null,
-	isAudio: boolean,
-	isVideo: boolean,
-	audioTrack?: AudioTrackInfo | null,
-};
-
-export type VideoStreamFormat_Serialize = {
-	itag: number,
-	mimeType: string,
-	qualityLabel: string | null,
-	bitrate: number,
-	url: string | null,
-	width: number | null,
-	height: number | null,
-	isAudio: boolean,
-	isVideo: boolean,
-	audioTrack: AudioTrackInfo | null,
 };
 
 export type WatchNextResults = WatchNextResults_Serialize | WatchNextResults_Deserialize;

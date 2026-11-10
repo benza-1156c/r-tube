@@ -75,13 +75,6 @@ pub struct SearchResults {
     pub continuation_token: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Type)]
-#[serde(rename_all = "camelCase")]
-pub struct AudioTrackInfo {
-    pub id: String,
-    pub display_name: String,
-    pub is_default: bool,
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
@@ -91,20 +84,6 @@ pub struct CaptionTrack {
     pub vtt_url: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Type)]
-#[serde(rename_all = "camelCase")]
-pub struct VideoStreamFormat {
-    pub itag: u32,
-    pub mime_type: String,
-    pub quality_label: Option<String>,
-    pub bitrate: u32,
-    pub url: Option<String>,
-    pub width: Option<u32>,
-    pub height: Option<u32>,
-    pub is_audio: bool,
-    pub is_video: bool,
-    pub audio_track: Option<AudioTrackInfo>,
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
@@ -118,10 +97,9 @@ pub struct PlayerResponse {
     pub view_count: String,
     pub is_live: bool,
     pub thumbnail_url: String,
-    pub formats: Vec<VideoStreamFormat>,
-    pub adaptive_formats: Vec<VideoStreamFormat>,
+    /// Proxied HLS master playlist. The only playback source the player uses:
+    /// HLS serves one URL per segment, which is what makes seeking work.
     pub hls_manifest_url: Option<String>,
-    pub dash_manifest_url: Option<String>,
     pub captions: Vec<CaptionTrack>,
 }
 
@@ -352,31 +330,6 @@ impl From<innertube_rs::SearchResults> for SearchResults {
     }
 }
 
-impl From<&innertube_rs::StreamingFormat> for VideoStreamFormat {
-    fn from(f: &innertube_rs::StreamingFormat) -> Self {
-        let is_audio = f.mime_type.starts_with("audio/")
-            || f.audio_track.is_some()
-            || f.mime_type.contains("mp4a")
-            || f.mime_type.contains("opus");
-        let is_video = f.mime_type.starts_with("video/");
-        Self {
-            itag: f.itag,
-            mime_type: f.mime_type.clone(),
-            quality_label: f.quality_label.clone(),
-            bitrate: f.bitrate as u32,
-            url: f.url.clone(),
-            width: f.width,
-            height: f.height,
-            is_audio,
-            is_video,
-            audio_track: f.audio_track.as_ref().map(|t| AudioTrackInfo {
-                id: t.id.clone(),
-                display_name: t.display_name.clone(),
-                is_default: t.audio_is_default,
-            }),
-        }
-    }
-}
 
 impl From<innertube_rs::PlayerResponse> for PlayerResponse {
     fn from(res: innertube_rs::PlayerResponse) -> Self {
@@ -421,25 +374,9 @@ impl From<innertube_rs::PlayerResponse> for PlayerResponse {
             )
         };
 
-        let (formats, adaptive_formats, hls_manifest_url, dash_manifest_url) =
-            if let Some(streaming) = res.streaming_data {
-                (
-                    streaming
-                        .formats
-                        .iter()
-                        .map(VideoStreamFormat::from)
-                        .collect(),
-                    streaming
-                        .adaptive_formats
-                        .iter()
-                        .map(VideoStreamFormat::from)
-                        .collect(),
-                    streaming.hls_manifest_url,
-                    streaming.dash_manifest_url,
-                )
-            } else {
-                (Vec::new(), Vec::new(), None, None)
-            };
+        let hls_manifest_url = res
+            .streaming_data
+            .and_then(|streaming| streaming.hls_manifest_url);
 
         Self {
             id,
@@ -451,10 +388,7 @@ impl From<innertube_rs::PlayerResponse> for PlayerResponse {
             view_count,
             is_live,
             thumbnail_url,
-            formats,
-            adaptive_formats,
             hls_manifest_url,
-            dash_manifest_url,
             captions: Vec::new(),
         }
     }

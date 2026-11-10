@@ -1,4 +1,4 @@
-use innertube_rs::{
+﻿use innertube_rs::{
     BrowseFeed, HomeFeed, Innertube, SearchResults, SessionOptions, TrendingFeed, WatchNextResults,
 };
 use reqwest::header::HeaderMap;
@@ -31,9 +31,8 @@ pub struct YoutubeClient {
 }
 
 impl YoutubeClient {
-    /// Create a new YoutubeClient instance with default anonymous session
     pub async fn new() -> Result<Self, AppError> {
-        let _ = crate::utils::proxy::init_stream_proxy().await;
+        let _ = crate::utils::proxy::ensure_proxy().await;
 
         let innertube = Innertube::new()
             .await
@@ -170,35 +169,25 @@ impl YoutubeClient {
             .map_err(|e| AppError::Internal(format!("YouTube search failed: {e}")))
     }
 
-    /// Get video information and player response with deciphered stream URLs
+    /// HLS is the only playback path: every segment arrives as its own URL,
     pub async fn get_video_info(&self, video_id: &str) -> Result<PlayerResponse, AppError> {
-        let yt = self.innertube.read().await;
-        let mut raw_player_res = yt
-            .get_video_info(video_id)
+        crate::utils::proxy::ensure_proxy()
             .await
-            .map_err(|e| AppError::Internal(format!("Failed to get video info: {e}")))?;
+            .map_err(|e| AppError::Internal(format!("Local stream proxy unavailable: {e}")))?;
 
-        // Decipher stream URLs (signature + n-parameter) for all formats and wrap with local proxy
-        if let Some(ref mut sd) = raw_player_res.streaming_data {
-            let mut nsig_cache = innertube_rs::utils::decipher::NsigCache::new();
-            for format in sd.formats.iter_mut().chain(sd.adaptive_formats.iter_mut()) {
-                if let Ok(resolved_url) = innertube_rs::endpoints::player::resolve_stream_url_full(
-                    format,
-                    &yt.player.decipherer,
-                    yt.session.po_token.as_deref(),
-                    Some(&mut nsig_cache),
-                ) {
-                    format.url = Some(crate::utils::proxy::wrap_stream_url(&resolved_url));
-                    format.signature_cipher = None;
-                    format.cipher = None;
-                } else if let Some(ref u) = format.url {
-                    format.url = Some(crate::utils::proxy::wrap_stream_url(u));
-                }
-            }
-        }
-        let mut player_res = PlayerResponse::from(raw_player_res);
+        let raw = {
+            let yt = self.innertube.read().await;
+            yt.get_video_info(video_id)
+                .await
+                .map_err(|e| AppError::Internal(format!("Failed to get video info: {e}")))?
+        };
 
-        // Fetch captions/transcripts if available
+        let mut player_res = PlayerResponse::from(raw);
+        player_res.hls_manifest_url = self
+            .hls_manifest_url(video_id)
+            .await
+            .map(|raw| crate::utils::proxy::wrap_hls_url(&raw, video_id));
+
         if let Ok(tracks) = self.anon_innertube.get_transcript_tracks(video_id).await {
             player_res.captions = tracks
                 .into_iter()
@@ -213,6 +202,32 @@ impl YoutubeClient {
         Ok(player_res)
     }
 
+    pub async fn hls_manifest_url(&self, video_id: &str) -> Option<String> {
+        for client in ["VISIONOS", "IOS", "ANDROID"] {
+            let options = innertube_rs::GetVideoInfoOptions {
+                client: Some(client.to_string()),
+                po_token: None,
+                playback_context: None,
+            };
+            match self
+                .anon_innertube
+                .get_basic_info(video_id, Some(&options))
+                .await
+            {
+                Ok(info) => {
+                    if let Some(url) = info
+                        .player_response
+                        .streaming_data
+                        .and_then(|sd| sd.hls_manifest_url)
+                    {
+                        return Some(url);
+                    }
+                }
+                Err(e) => eprintln!("[YouTube] HLS via {client} failed: {e}"),
+            }
+        }
+        None
+    }
     /// Get watch next details (related videos and playlist context)
     pub async fn get_watch_next(&self, video_id: &str) -> Result<WatchNextResults, AppError> {
         let yt = self.innertube.read().await;
@@ -413,33 +428,69 @@ impl YoutubeClient {
 mod tests {
     use super::*;
 
+    /// The playback contract: a proxied HLS master playlist, and its segments
+    /// reachable through the proxy.
     #[tokio::test]
-    async fn test_get_video_info_decipher() {
+    async fn video_info_has_proxied_hls_manifest() {
         let client = YoutubeClient::new().await.expect("Failed to create client");
-        let res = client
-            .get_video_info("3ryID_SwU5E")
+        let video_id =
+            std::env::var("PROBE_VIDEO_ID").unwrap_or_else(|_| "8XXPxLLgwt8".to_string());
+        let info = client
+            .get_video_info(&video_id)
             .await
             .expect("Failed to get video info");
-        let sample = res
-            .formats
-            .iter()
-            .chain(res.adaptive_formats.iter())
-            .find(|f| f.url.is_some())
-            .expect("Expected at least 1 playable resolved URL");
 
-        let url = sample.url.as_ref().unwrap();
-        println!("PROXY URL: {}", url);
-        assert!(url.starts_with("http://127.0.0.1:"), "URL should be wrapped by local proxy");
+        assert!(!info.title.is_empty(), "expected a title");
+        let hls = info
+            .hls_manifest_url
+            .as_deref()
+            .expect("expected an HLS manifest");
+        assert!(
+            hls.starts_with("http://127.0.0.1:"),
+            "HLS manifest must be proxied, got: {hls}"
+        );
 
-        // Test requesting from local proxy
-        let http_client = reqwest::Client::new();
-        let resp = http_client
-            .get(url)
-            .header("Range", "bytes=0-100")
+        let http = reqwest::Client::new();
+        let master = http
+            .get(hls)
             .send()
             .await
-            .expect("Failed to fetch from proxy");
-        println!("PROXY STATUS: {}", resp.status());
-        assert_eq!(resp.status(), 206, "Local proxy should return 206 Partial Content");
+            .expect("proxy request failed")
+            .text()
+            .await
+            .expect("body");
+        assert!(master.starts_with("#EXTM3U"), "expected a playlist");
+        assert!(
+            master.contains("http://127.0.0.1:"),
+            "every playlist URI should be rewritten through the proxy"
+        );
+
+        // Fetch one rewritten variant playlist: its segments must resolve too.
+        let variant = master
+            .lines()
+            .find(|line| line.starts_with("http://127.0.0.1:"))
+            .expect("a rewritten variant URI");
+        let media = http
+            .get(variant)
+            .send()
+            .await
+            .expect("variant request failed")
+            .text()
+            .await
+            .expect("variant body");
+        assert!(media.starts_with("#EXTM3U"), "expected a media playlist");
+
+        let segment = media
+            .lines()
+            .find(|line| line.starts_with("http://127.0.0.1:"))
+            .expect("a rewritten segment URI");
+        let resp = http.get(segment).send().await.expect("segment request");
+        assert!(
+            resp.status().is_success(),
+            "segment request failed: {}",
+            resp.status()
+        );
+        let bytes = resp.bytes().await.expect("segment bytes");
+        assert!(bytes.len() > 1000, "segment too small: {}", bytes.len());
     }
 }

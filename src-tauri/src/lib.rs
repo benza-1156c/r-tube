@@ -46,6 +46,12 @@ pub fn run() {
                         .expect("Failed to initialize YouTube client"),
                 );
 
+                let hls_yt = std::sync::Arc::clone(&yt);
+                utils::proxy::set_manifest_refresher(move |video_id| {
+                    let yt = std::sync::Arc::clone(&hls_yt);
+                    Box::pin(async move { yt.hls_manifest_url(&video_id).await })
+                });
+
                 let _ = yt.init_from_active_profile(&db).await;
 
                 app_handle.manage(AppState::new(db, app_path, yt));
