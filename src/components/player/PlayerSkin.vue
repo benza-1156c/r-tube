@@ -2,6 +2,9 @@
 import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { usePlayer } from "@/composables/usePlayer";
 
+// Must run before the Video.js modules below register their elements: it
+// keeps a moved player from being treated as a reconnected one.
+import "./playerElementMove";
 import "@videojs/html/video/player";
 import "@videojs/html/video/skin";
 import "@videojs/html/media/hlsjs-video";

@@ -3,6 +3,7 @@ import { computed, ref } from "vue";
 import { useRouter } from "vue-router";
 import { usePlayer } from "@/composables/usePlayer";
 import { useControlsHold } from "./useControlsHold";
+import { usePlayerStage } from "./usePlayerStage";
 import PlayerSkin from "./PlayerSkin.vue";
 import WatchPlayerChrome from "./WatchPlayerChrome.vue";
 import MiniPlayerBar from "./MiniPlayerBar.vue";
@@ -13,16 +14,23 @@ const router = useRouter();
 const player = usePlayer();
 
 const rootRef = ref<HTMLElement | null>(null);
+const stageRef = ref<HTMLElement | null>(null);
 
 /**
  * Mini mode is "the player is not docked in a page": either the user
  * minimized it, or the current page has no player slot. In both cases it
- * renders where it is mounted instead of being teleported.
+ * stays in its stage (see AppLayout's player host).
  */
 const isMini = computed(
   () => player.isMiniPlayer.value || !player.watchAnchor.value,
 );
 
+/** Element that should hold the player right now (`null` = stay in the stage). */
+const playerHost = computed(() =>
+  isMini.value ? null : player.watchAnchor.value,
+);
+
+usePlayerStage(rootRef, stageRef, playerHost);
 useControlsHold(rootRef, player);
 
 function expandToWatch(): void {
@@ -36,14 +44,12 @@ function expandToWatch(): void {
 
 <template>
   <!--
-    Watch mode teleports the player into the page's player slot, so it scrolls
-    with the page. Mini mode renders in place (see AppLayout's player host),
-    pinned to the corner.
+    One player for the whole app. `usePlayerStage` moves this element into the
+    watch page's slot while that page is open and back into this stage for the
+    mini player; it is never re-created, so playback, volume and the HLS engine
+    survive the switch.
   -->
-  <Teleport
-    :to="player.watchAnchor.value ?? 'body'"
-    :disabled="isMini"
-  >
+  <div ref="stageRef" class="rt-player-stage">
     <div
       v-show="player.isOpen.value"
       id="global-player-root"
@@ -56,10 +62,6 @@ function expandToWatch(): void {
       "
     >
       <div class="rt-player__frame aspect-video w-full">
-        <!--
-          One player element for both modes: it is moved, never re-created, so
-          switching to the mini player keeps playback going.
-        -->
         <PlayerSkin>
           <WatchPlayerChrome v-if="!isMini" />
         </PlayerSkin>
@@ -72,7 +74,7 @@ function expandToWatch(): void {
         @close="player.closePlayer"
       />
     </div>
-  </Teleport>
+  </div>
 </template>
 
 <style>
