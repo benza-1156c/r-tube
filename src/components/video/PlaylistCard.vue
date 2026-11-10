@@ -46,7 +46,7 @@ function openPlaylist() {
 
       <!-- Playlist / Mix Overlay Bar on the Right Side (YouTube Style) -->
       <div
-        class="absolute inset-y-0 right-0 w-2/5 bg-gradient-to-l from-black/80 to-transparent flex flex-col items-center justify-center gap-1 text-white opacity-90 group-hover:opacity-100 transition-opacity"
+        class="absolute inset-y-0 right-0 w-2/5 bg-linear-to-l from-black/80 to-transparent flex flex-col items-center justify-center gap-1 text-white opacity-90 group-hover:opacity-100 transition-opacity"
       >
         <ListMusic class="h-5 w-5" />
         <span class="text-[11px] font-semibold tracking-wide">
@@ -109,4 +109,3 @@ function openPlaylist() {
     </div>
   </div>
 </template>
-

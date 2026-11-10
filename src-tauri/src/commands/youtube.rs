@@ -7,7 +7,6 @@ use crate::models::youtube::{
 };
 use crate::services::youtube::CurrentUserProfile;
 use crate::state::AppState;
-use crate::utils::log;
 
 #[app_command]
 pub async fn get_home_feed(
@@ -20,8 +19,6 @@ pub async fn get_home_feed(
         .get_home_feed(continuation.as_deref(), params.as_deref())
         .await?;
     let res: HomeFeed = feed.into();
-    let _ = log::dump_json("feed_videos", &res.videos);
-    let _ = log::dump_json("feed_playlists", &res.playlists);
     Ok(res)
 }
 
