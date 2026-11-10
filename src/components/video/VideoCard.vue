@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { VideoItem } from "@/bindings";
-import { CheckCircle2, Play } from "@lucide/vue";
+import { CheckCircle2, Play, ListMusic } from "@lucide/vue";
 
 const props = defineProps<{
   video: VideoItem;
@@ -9,7 +9,14 @@ const props = defineProps<{
 const router = useRouter();
 
 function openVideo() {
-  router.push(`/watch/${props.video.id}`);
+  if (props.video.playlistId) {
+    router.push({
+      path: `/watch/${props.video.id}`,
+      query: { list: props.video.playlistId },
+    });
+  } else {
+    router.push(`/watch/${props.video.id}`);
+  }
 }
 </script>
 
@@ -42,8 +49,13 @@ function openVideo() {
 
       <!-- Duration Badge -->
       <span
-        class="absolute bottom-2 right-2 rounded-md bg-black/80 px-1.5 py-0.5 text-xs font-semibold tracking-wide text-white"
+        v-if="video.duration"
+        class="absolute bottom-2 right-2 flex items-center gap-1 rounded-md bg-black/80 px-1.5 py-0.5 text-xs font-semibold tracking-wide text-white"
       >
+        <ListMusic
+          v-if="video.playlistId || video.duration === 'Mix' || video.duration.toLowerCase().includes('video')"
+          class="h-3 w-3"
+        />
         {{ video.duration }}
       </span>
     </div>
@@ -53,11 +65,24 @@ function openVideo() {
       <!-- Channel Avatar -->
       <div class="shrink-0">
         <img
+          v-if="video.channelAvatarUrl"
           :src="video.channelAvatarUrl"
           :alt="video.channelName"
           class="h-9 w-9 rounded-full object-cover ring-1 ring-border"
           loading="lazy"
         />
+        <div
+          v-else
+          class="flex h-9 w-9 items-center justify-center rounded-full bg-muted text-muted-foreground ring-1 ring-border"
+        >
+          <ListMusic
+            v-if="video.playlistId || video.duration === 'Mix'"
+            class="h-4 w-4"
+          />
+          <span v-else class="text-xs font-semibold uppercase">
+            {{ video.channelName?.charAt(0) || "Y" }}
+          </span>
+        </div>
       </div>
 
       <!-- Info Details -->
@@ -79,10 +104,13 @@ function openVideo() {
           />
         </div>
 
-        <div class="flex items-center gap-1 text-xs text-muted-foreground/80">
-          <span>{{ video.viewCount }}</span>
-          <span>•</span>
-          <span>{{ video.publishedAt }}</span>
+        <div
+          v-if="video.viewCount || video.publishedAt"
+          class="flex items-center gap-1 text-xs text-muted-foreground/80"
+        >
+          <span v-if="video.viewCount">{{ video.viewCount }}</span>
+          <span v-if="video.viewCount && video.publishedAt">•</span>
+          <span v-if="video.publishedAt">{{ video.publishedAt }}</span>
         </div>
       </div>
     </div>

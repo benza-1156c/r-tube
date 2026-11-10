@@ -14,6 +14,23 @@ pub struct VideoItem {
     pub is_live: bool,
     pub view_count: String,
     pub published_at: String,
+    #[serde(default)]
+    pub playlist_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct PlaylistItem {
+    pub id: String,
+    pub title: String,
+    pub thumbnail_url: String,
+    pub author_name: String,
+    pub author_avatar_url: String,
+    pub video_count: Option<u32>,
+    pub first_video_id: Option<String>,
+    pub last_updated: Option<String>,
+    pub view_count: Option<String>,
+    pub badge_text: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
@@ -29,6 +46,7 @@ pub struct FilterChip {
 pub struct HomeFeed {
     pub filter_chips: Vec<FilterChip>,
     pub videos: Vec<VideoItem>,
+    pub playlists: Vec<PlaylistItem>,
     pub continuation_token: Option<String>,
 }
 
@@ -37,6 +55,7 @@ pub struct HomeFeed {
 pub struct BrowseFeed {
     pub browse_id: String,
     pub videos: Vec<VideoItem>,
+    pub playlists: Vec<PlaylistItem>,
     pub continuation_token: Option<String>,
 }
 
@@ -52,6 +71,7 @@ pub struct TrendingFeed {
 pub struct SearchResults {
     pub query: String,
     pub videos: Vec<VideoItem>,
+    pub playlists: Vec<PlaylistItem>,
     pub continuation_token: Option<String>,
 }
 
@@ -146,6 +166,55 @@ impl From<&innertube_rs::VideoNode> for VideoItem {
             is_live: v.is_live,
             view_count: v.view_count.clone().unwrap_or_default(),
             published_at: v.published_time.clone().unwrap_or_default(),
+            playlist_id: None,
+        }
+    }
+}
+
+impl From<&innertube_rs::PlaylistNode> for PlaylistItem {
+    fn from(p: &innertube_rs::PlaylistNode) -> Self {
+        let thumbnail_url = p
+            .thumbnails
+            .best_url()
+            .or_else(|| p.thumbnails.first_url())
+            .unwrap_or_default()
+            .to_string();
+
+        let author_name = p
+            .author
+            .as_ref()
+            .map(|a| a.name.clone())
+            .unwrap_or_else(|| "YouTube".to_string());
+
+        let author_avatar_url = p
+            .author
+            .as_ref()
+            .and_then(|a| a.thumbnails.best_url().or_else(|| a.thumbnails.first_url()))
+            .unwrap_or_default()
+            .to_string();
+
+        let watch_ep = p.endpoint.as_ref().and_then(|e| e.watch.as_ref());
+        let first_video_id = watch_ep
+            .map(|w| w.video_id.clone())
+            .filter(|id| !id.is_empty());
+
+        let badge_text = if let Some(count) = p.video_count {
+            format!("{count} videos")
+        } else {
+            "Mix".to_string()
+        };
+
+        Self {
+            id: p.id.clone(),
+            title: p.title.clone(),
+            thumbnail_url,
+            author_name,
+            author_avatar_url,
+            video_count: p.video_count,
+            first_video_id,
+            last_updated: p.last_updated.clone(),
+            view_count: p.view_count.clone(),
+            badge_text,
         }
     }
 }
@@ -163,6 +232,7 @@ impl From<innertube_rs::HomeFeed> for HomeFeed {
                 })
                 .collect(),
             videos: feed.videos.iter().map(VideoItem::from).collect(),
+            playlists: feed.playlists.iter().map(PlaylistItem::from).collect(),
             continuation_token: feed.continuation_token,
         }
     }
@@ -173,6 +243,7 @@ impl From<innertube_rs::BrowseFeed> for BrowseFeed {
         Self {
             browse_id: feed.browse_id,
             videos: feed.videos.iter().map(VideoItem::from).collect(),
+            playlists: feed.playlists.iter().map(PlaylistItem::from).collect(),
             continuation_token: feed.continuation_token,
         }
     }
@@ -189,10 +260,11 @@ impl From<innertube_rs::TrendingFeed> for TrendingFeed {
 
 impl From<innertube_rs::SearchResults> for SearchResults {
     fn from(res: innertube_rs::SearchResults) -> Self {
-        let videos = res
-            .items
-            .into_iter()
-            .filter_map(|item| match item {
+        let mut videos = Vec::new();
+        let mut playlists = Vec::new();
+
+        for item in res.items {
+            match item {
                 innertube_rs::SearchResultItem::Video(v) => {
                     let thumb = v
                         .thumbnails
@@ -201,7 +273,7 @@ impl From<innertube_rs::SearchResults> for SearchResults {
                         .map(|t| t.url.clone())
                         .unwrap_or_default();
 
-                    Some(VideoItem {
+                    videos.push(VideoItem {
                         id: v.video_id,
                         title: v.title,
                         thumbnail_url: thumb,
@@ -212,15 +284,51 @@ impl From<innertube_rs::SearchResults> for SearchResults {
                         is_live: false,
                         view_count: v.view_count.unwrap_or_default(),
                         published_at: v.published_time.unwrap_or_default(),
-                    })
+                        playlist_id: None,
+                    });
                 }
-                _ => None,
-            })
-            .collect();
+                innertube_rs::SearchResultItem::Playlist(p) => {
+                    let thumb = p
+                        .thumbnails
+                        .last()
+                        .or_else(|| p.thumbnails.first())
+                        .map(|t| t.url.clone())
+                        .unwrap_or_default();
+
+                    let video_count_num = p.video_count.as_deref().and_then(|vc| {
+                        vc.chars()
+                            .filter(|c| c.is_ascii_digit())
+                            .collect::<String>()
+                            .parse()
+                            .ok()
+                    });
+
+                    let badge_text = p
+                        .video_count
+                        .clone()
+                        .unwrap_or_else(|| "Playlist".to_string());
+
+                    playlists.push(PlaylistItem {
+                        id: p.playlist_id.clone(),
+                        title: p.title,
+                        thumbnail_url: thumb,
+                        author_name: p.author,
+                        author_avatar_url: String::new(),
+                        video_count: video_count_num,
+                        first_video_id: None,
+                        last_updated: None,
+                        view_count: None,
+                        badge_text,
+                    });
+                }
+                _ => {}
+            }
+        }
 
         Self {
             query: res.query,
             videos,
+            playlists,
             continuation_token: res.continuation_token,
         }
     }
@@ -350,6 +458,7 @@ impl From<innertube_rs::WatchNextResults> for WatchNextResults {
                     is_live: r.is_live,
                     view_count: r.view_count_text.unwrap_or_default(),
                     published_at: r.published_time_text.unwrap_or_default(),
+                    playlist_id: None,
                 }
             })
             .collect();

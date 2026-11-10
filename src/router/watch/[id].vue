@@ -8,10 +8,12 @@ import {
   Play,
 } from "@lucide/vue";
 
+defineOptions({ name: "WatchPage" });
+
 const route = useRoute();
 const router = useRouter();
-
 const videoId = (route.params as Record<string, any>)?.id || "dQw4w9WgXcQ";
+const playlistId = computed(() => (route.query as Record<string, any>)?.list as string | undefined);
 
 const relatedVideos = [
   {
@@ -78,8 +80,9 @@ const relatedVideos = [
           >
             <Play class="h-8 w-8 fill-white translate-x-0.5" />
           </div>
-          <p class="text-sm font-medium text-white/80">
+          <p class="text-sm font-medium text-white/80 text-center">
             Playing Video ID: {{ videoId }}
+            <span v-if="playlistId" class="block text-xs text-white/60 mt-1">Playlist: {{ playlistId }}</span>
           </p>
         </div>
       </div>

@@ -14,7 +14,7 @@ export const commands = {
 	deleteProfile: (id: number) => typedError<boolean, AppError_Serialize>(__TAURI_INVOKE("delete_profile", { id })),
 	getHomeFeed: (continuation: string | null, params: string | null) => typedError<HomeFeed_Serialize, AppError_Serialize>(__TAURI_INVOKE("get_home_feed", { continuation, params })),
 	getSubscriptionsFeed: () => typedError<BrowseFeed_Serialize, AppError_Serialize>(__TAURI_INVOKE("get_subscriptions_feed")),
-	getTrending: () => typedError<TrendingFeed, AppError_Serialize>(__TAURI_INVOKE("get_trending")),
+	getTrending: () => typedError<TrendingFeed_Serialize, AppError_Serialize>(__TAURI_INVOKE("get_trending")),
 	search: (query: string, continuation: string | null) => typedError<SearchResults_Serialize, AppError_Serialize>(__TAURI_INVOKE("search", { query, continuation })),
 	getVideoInfo: (videoId: string) => typedError<PlayerResponse_Serialize, AppError_Serialize>(__TAURI_INVOKE("get_video_info", { videoId })),
 	getWatchNext: (videoId: string) => typedError<WatchNextResults_Serialize, AppError_Serialize>(__TAURI_INVOKE("get_watch_next", { videoId })),
@@ -32,13 +32,15 @@ export type BrowseFeed = BrowseFeed_Serialize | BrowseFeed_Deserialize;
 
 export type BrowseFeed_Deserialize = {
 	browseId: string,
-	videos: VideoItem[],
+	videos: VideoItem_Deserialize[],
+	playlists: PlaylistItem_Deserialize[],
 	continuationToken?: string | null,
 };
 
 export type BrowseFeed_Serialize = {
 	browseId: string,
-	videos: VideoItem[],
+	videos: VideoItem_Serialize[],
+	playlists: PlaylistItem_Serialize[],
 	continuationToken: string | null,
 };
 
@@ -76,13 +78,15 @@ export type HomeFeed = HomeFeed_Serialize | HomeFeed_Deserialize;
 
 export type HomeFeed_Deserialize = {
 	filterChips: FilterChip_Deserialize[],
-	videos: VideoItem[],
+	videos: VideoItem_Deserialize[],
+	playlists: PlaylistItem_Deserialize[],
 	continuationToken?: string | null,
 };
 
 export type HomeFeed_Serialize = {
 	filterChips: FilterChip_Serialize[],
-	videos: VideoItem[],
+	videos: VideoItem_Serialize[],
+	playlists: PlaylistItem_Serialize[],
 	continuationToken: string | null,
 };
 
@@ -131,26 +135,65 @@ export type PlayerResponse_Serialize = {
 	dashManifestUrl: string | null,
 };
 
+export type PlaylistItem = PlaylistItem_Serialize | PlaylistItem_Deserialize;
+
+export type PlaylistItem_Deserialize = {
+	id: string,
+	title: string,
+	thumbnailUrl: string,
+	authorName: string,
+	authorAvatarUrl: string,
+	videoCount?: number | null,
+	firstVideoId?: string | null,
+	lastUpdated?: string | null,
+	viewCount?: string | null,
+	badgeText: string,
+};
+
+export type PlaylistItem_Serialize = {
+	id: string,
+	title: string,
+	thumbnailUrl: string,
+	authorName: string,
+	authorAvatarUrl: string,
+	videoCount: number | null,
+	firstVideoId: string | null,
+	lastUpdated: string | null,
+	viewCount: string | null,
+	badgeText: string,
+};
+
 export type SearchResults = SearchResults_Serialize | SearchResults_Deserialize;
 
 export type SearchResults_Deserialize = {
 	query: string,
-	videos: VideoItem[],
+	videos: VideoItem_Deserialize[],
+	playlists: PlaylistItem_Deserialize[],
 	continuationToken?: string | null,
 };
 
 export type SearchResults_Serialize = {
 	query: string,
-	videos: VideoItem[],
+	videos: VideoItem_Serialize[],
+	playlists: PlaylistItem_Serialize[],
 	continuationToken: string | null,
 };
 
-export type TrendingFeed = {
+export type TrendingFeed = TrendingFeed_Serialize | TrendingFeed_Deserialize;
+
+export type TrendingFeed_Deserialize = {
 	currentTab: string,
-	videos: VideoItem[],
+	videos: VideoItem_Deserialize[],
 };
 
-export type VideoItem = {
+export type TrendingFeed_Serialize = {
+	currentTab: string,
+	videos: VideoItem_Serialize[],
+};
+
+export type VideoItem = VideoItem_Serialize | VideoItem_Deserialize;
+
+export type VideoItem_Deserialize = {
 	id: string,
 	title: string,
 	thumbnailUrl: string,
@@ -161,6 +204,21 @@ export type VideoItem = {
 	isLive: boolean,
 	viewCount: string,
 	publishedAt: string,
+	playlistId?: string | null,
+};
+
+export type VideoItem_Serialize = {
+	id: string,
+	title: string,
+	thumbnailUrl: string,
+	duration: string,
+	channelName: string,
+	channelAvatarUrl: string,
+	isVerified: boolean,
+	isLive: boolean,
+	viewCount: string,
+	publishedAt: string,
+	playlistId: string | null,
 };
 
 export type VideoStreamFormat = VideoStreamFormat_Serialize | VideoStreamFormat_Deserialize;
@@ -195,7 +253,7 @@ export type WatchNextResults_Deserialize = {
 	currentVideoId: string,
 	currentTitle?: string | null,
 	currentAuthor?: string | null,
-	relatedVideos: VideoItem[],
+	relatedVideos: VideoItem_Deserialize[],
 	continuationToken?: string | null,
 };
 
@@ -203,7 +261,7 @@ export type WatchNextResults_Serialize = {
 	currentVideoId: string,
 	currentTitle: string | null,
 	currentAuthor: string | null,
-	relatedVideos: VideoItem[],
+	relatedVideos: VideoItem_Serialize[],
 	continuationToken: string | null,
 };
 

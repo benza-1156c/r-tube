@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { useRoute } from "vue-router";
+import { computed } from "vue";
+
 const route = useRoute();
 
 const shouldHideSidebar = computed(() => Boolean(route.meta.hideSidebar));
@@ -16,7 +19,11 @@ const shouldHideHeader = computed(() => Boolean(route.meta.hideHeader));
       <AppHeader v-if="!shouldHideHeader" :hide-sidebar="shouldHideSidebar" />
 
       <main class="flex-1 overflow-y-auto">
-        <router-view />
+        <router-view v-slot="{ Component }">
+          <keep-alive exclude="WatchPage">
+            <component :is="Component" />
+          </keep-alive>
+        </router-view>
       </main>
     </SidebarInset>
   </SidebarProvider>

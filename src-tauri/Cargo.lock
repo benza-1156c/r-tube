@@ -2265,7 +2265,7 @@ dependencies = [
 [[package]]
 name = "innertube-rs"
 version = "0.10.1"
-source = "git+https://github.com/caya8205-2/innertube-rs?branch=main#f4b3b11c2f09a906959ea5609b361bdd6b97ebcc"
+source = "git+https://github.com/benza-1156c/innertube-rs?branch=main#594b10df11dd4ed5fc9ae15787fbb4f9f987a0dd"
 dependencies = [
  "base64 0.23.1",
  "bytes",
@@ -3523,7 +3523,7 @@ version = "0.14.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "03da047801ff44bb6a4d407d4860c05fd70bb81714e6b2f3812603d5b145b042"
 dependencies = [
- "heck 0.5.0",
+ "heck 0.4.1",
  "itertools",
  "log",
  "multimap",
@@ -5522,7 +5522,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.4.3",
+ "getrandom 0.3.4",
  "once_cell",
  "rustix",
  "windows-sys 0.61.2",
@@ -6349,7 +6349,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]

@@ -38,6 +38,7 @@ declare module 'vue' {
     DropdownMenuSubTrigger: typeof import('./../lib/components/ui/dropdown-menu/DropdownMenuSubTrigger.vue')['default']
     DropdownMenuTrigger: typeof import('./../lib/components/ui/dropdown-menu/DropdownMenuTrigger.vue')['default']
     Input: typeof import('./../lib/components/ui/input/Input.vue')['default']
+    PlaylistCard: typeof import('./../components/video/PlaylistCard.vue')['default']
     Progress: typeof import('./../lib/components/ui/progress/Progress.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']

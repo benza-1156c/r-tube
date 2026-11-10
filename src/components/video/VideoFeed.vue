@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
-import { commands, type VideoItem, type FilterChip } from "@/bindings";
+import { commands, type FilterChip } from "@/bindings";
+import type { FeedItem } from "@/components/video/VideoGrid.vue";
 
 const props = defineProps<{
   categoryParams: string | null;
@@ -12,7 +13,7 @@ const emit = defineEmits<{
 
 const isLoading = ref(false);
 const continuation = ref<string | null>(null);
-const videos = ref<VideoItem[]>([]);
+const items = ref<FeedItem[]>([]);
 const bottomTarget = ref<HTMLElement | null>(null);
 
 async function get_homefeed() {
@@ -24,7 +25,21 @@ async function get_homefeed() {
       props.categoryParams,
     );
     if (res.status === "ok") {
-      videos.value.push(...res.data.videos);
+      const batchItems: FeedItem[] = [];
+
+      if (res.data.playlists && res.data.playlists.length > 0) {
+        for (const p of res.data.playlists) {
+          batchItems.push({ kind: "playlist", data: p });
+        }
+      }
+
+      if (res.data.videos && res.data.videos.length > 0) {
+        for (const v of res.data.videos) {
+          batchItems.push({ kind: "video", data: v });
+        }
+      }
+
+      items.value.push(...batchItems);
       continuation.value = res.data.continuationToken ?? null;
 
       if (res.data.filterChips && res.data.filterChips.length > 0) {
@@ -52,7 +67,7 @@ onMounted(() => {
 
 <template>
   <div class="flex-1 flex flex-col">
-    <VideoGrid :videos="videos" :loading="isLoading" />
+    <VideoGrid :items="items" :loading="isLoading" />
     <div ref="bottomTarget" class="h-10 w-full"></div>
   </div>
 </template>

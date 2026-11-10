@@ -40,7 +40,8 @@ sea-orm = { version = "1.1", features = [
     "runtime-tokio-rustls",
     "macros",
 ] }
-innertube-rs = { git = "https://github.com/caya8205-2/innertube-rs", branch = "main" }
+# innertube-rs = { git = "https://github.com/caya8205-2/innertube-rs", branch = "main" }
+innertube-rs = { git = "https://github.com/benza-1156c/innertube-rs", branch = "main" }
 rtube-macros = { path = "macros" }
 sea-orm-migration = { version = "1.1", features = [
     "sqlx-sqlite",

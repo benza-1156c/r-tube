@@ -1,17 +1,56 @@
 <script setup lang="ts">
-import { VideoItem } from "@/bindings";
+import { computed } from "vue";
+import { VideoItem, PlaylistItem } from "@/bindings";
+import VideoCard from "@/components/video/VideoCard.vue";
+import PlaylistCard from "@/components/video/PlaylistCard.vue";
 
-defineProps<{
-  videos: VideoItem[];
+export type FeedItem =
+  | { kind: "video"; data: VideoItem }
+  | { kind: "playlist"; data: PlaylistItem };
+
+const props = defineProps<{
+  items?: FeedItem[];
+  videos?: VideoItem[];
+  playlists?: PlaylistItem[];
   loading?: boolean;
 }>();
+
+const displayItems = computed<FeedItem[]>(() => {
+  if (props.items && props.items.length > 0) {
+    return props.items;
+  }
+  const result: FeedItem[] = [];
+  if (props.playlists) {
+    for (const p of props.playlists) {
+      result.push({ kind: "playlist", data: p });
+    }
+  }
+  if (props.videos) {
+    for (const v of props.videos) {
+      result.push({ kind: "video", data: v });
+    }
+  }
+  return result;
+});
 </script>
 
 <template>
   <div
     class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-x-4 gap-y-7 p-6"
   >
-    <VideoCard v-for="video in videos" :key="video.id" :video="video" />
+    <template
+      v-for="item in displayItems"
+      :key="item.kind === 'video' ? `v-${item.data.id}` : `p-${item.data.id}`"
+    >
+      <PlaylistCard
+        v-if="item.kind === 'playlist'"
+        :playlist="item.data"
+      />
+      <VideoCard
+        v-else-if="item.kind === 'video'"
+        :video="item.data"
+      />
+    </template>
 
     <!-- Skeleton Loaders -->
     <template v-if="loading">
