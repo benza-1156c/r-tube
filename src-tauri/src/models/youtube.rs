@@ -75,7 +75,6 @@ pub struct SearchResults {
     pub continuation_token: Option<String>,
 }
 
-
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct CaptionTrack {
@@ -83,7 +82,6 @@ pub struct CaptionTrack {
     pub name: String,
     pub vtt_url: String,
 }
-
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
@@ -329,7 +327,6 @@ impl From<innertube_rs::SearchResults> for SearchResults {
         }
     }
 }
-
 
 impl From<innertube_rs::PlayerResponse> for PlayerResponse {
     fn from(res: innertube_rs::PlayerResponse) -> Self {

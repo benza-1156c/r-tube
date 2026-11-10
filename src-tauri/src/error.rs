@@ -6,16 +6,32 @@ use thiserror::Error;
 #[serde(tag = "type", content = "message")]
 pub enum AppError {
     #[error("Database error: {0}")]
-    Database(#[specta(type = String)] #[serde(serialize_with = "log_database")] String),
+    Database(
+        #[specta(type = String)]
+        #[serde(serialize_with = "log_database")]
+        String,
+    ),
 
     #[error("{0}")]
-    NotFound(#[specta(type = String)] #[serde(serialize_with = "log_not_found")] String),
+    NotFound(
+        #[specta(type = String)]
+        #[serde(serialize_with = "log_not_found")]
+        String,
+    ),
 
     #[error("Validation error: {0}")]
-    Validation(#[specta(type = String)] #[serde(serialize_with = "log_validation")] String),
+    Validation(
+        #[specta(type = String)]
+        #[serde(serialize_with = "log_validation")]
+        String,
+    ),
 
     #[error("Internal error: {0}")]
-    Internal(#[specta(type = String)] #[serde(serialize_with = "log_internal")] String),
+    Internal(
+        #[specta(type = String)]
+        #[serde(serialize_with = "log_internal")]
+        String,
+    ),
 }
 
 fn log_error<S>(variant: &str, msg: &str, serializer: S) -> Result<S::Ok, S::Error>

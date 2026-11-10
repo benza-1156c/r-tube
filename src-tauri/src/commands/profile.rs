@@ -14,9 +14,7 @@ pub async fn get_active_profile(
 }
 
 #[app_command]
-pub async fn get_all_profiles(
-    state: State<'_, AppState>,
-) -> Result<Vec<profile::Model>, AppError> {
+pub async fn get_all_profiles(state: State<'_, AppState>) -> Result<Vec<profile::Model>, AppError> {
     profile_service::get_all_profiles(&state.db).await
 }
 

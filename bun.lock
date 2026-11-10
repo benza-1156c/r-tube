@@ -9,6 +9,7 @@
         "@tailwindcss/vite": "^4.3.5",
         "@tauri-apps/api": "^2.12.4",
         "@tauri-apps/plugin-opener": "^2.7.2",
+        "@tauri-apps/plugin-store": "~2.5.1",
         "@videojs/dash-video": "10.3.0",
         "@videojs/hlsjs-video": "10.3.0",
         "@videojs/html": "10.3.0",
@@ -194,6 +195,8 @@
     "@tauri-apps/cli-win32-x64-msvc": ["@tauri-apps/cli-win32-x64-msvc@2.12.4", "", { "os": "win32", "cpu": "x64" }, "sha512-DJhDeCqjLDNMWYFy7ZS8cfeAHX2RK0RbQMLiA3bMVVkXRDJ4NBYiHriGqsUhsr9iG41aTb+dJGkFPmPw1gWwVw=="],
 
     "@tauri-apps/plugin-opener": ["@tauri-apps/plugin-opener@2.7.2", "", { "dependencies": { "@tauri-apps/api": "^2.12.0" } }, "sha512-LyybP1VSzTMQiaFYcsbAse47KpivlyXdLZMQzGLEnkgQacGESnpjAfFoQ6h5sqWgAdZDH9szYjPzHMpv0Sz+TQ=="],
+
+    "@tauri-apps/plugin-store": ["@tauri-apps/plugin-store@2.5.1", "", { "dependencies": { "@tauri-apps/api": "^2.12.0" } }, "sha512-lm/84hFRWHKayZI08p4upYYvhujcULXZLIJuATz3Ky6ZUN0hlmgvOIUytl8iTJA/no0nfhnaxDDHrPk1C5psaQ=="],
 
     "@types/estree": ["@types/estree@1.0.10", "", {}, "sha512-lTyOMnOcmRBzdCv6/4zUZCrEhV0xrqQiUZBZtVcbmLHBXKLnN8q89v/wKRF/Q0HbwVsqbIG3o5HDoFl9sduM+g=="],
 

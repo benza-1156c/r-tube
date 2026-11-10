@@ -6,8 +6,8 @@ use tokio::net::TcpStream;
 
 use super::connection::write_text;
 use super::{
-    log_line, wrap_hls_url, ACCEPT_LANGUAGE, CHROME_USER_AGENT, MANIFEST_REFRESHER, YT_ORIGIN,
-    YT_REFERER,
+    ACCEPT_LANGUAGE, CHROME_USER_AGENT, MANIFEST_REFRESHER, YT_ORIGIN, YT_REFERER, log_line,
+    wrap_hls_url,
 };
 
 /// Serve one HLS playlist (rewritten) or stream a media segment through.
@@ -52,9 +52,7 @@ async fn serve_refreshed(
     };
 
     match fetch(client, &raw).await {
-        Ok(response) => {
-            serve_response(stream, response, &raw, video_id, is_playlist, method).await
-        }
+        Ok(response) => serve_response(stream, response, &raw, video_id, is_playlist, method).await,
         Err(e) => {
             log_line(&format!("HLS refresh failed: {e}"));
             write_text(stream, 502, "upstream rejected the request").await
@@ -252,9 +250,12 @@ mod tests {
 
     #[test]
     fn rewrites_uri_attributes_and_relative_paths() {
-        let media =
-            "#EXTM3U\n#EXT-X-KEY:METHOD=AES-128,URI=\"key.bin\"\n#EXTINF:2.0,\nseg1.m4s\n";
-        let out = rewrite_playlist(media, "https://manifest.googlevideo.com/a/b/index.m3u8", "vid1");
+        let media = "#EXTM3U\n#EXT-X-KEY:METHOD=AES-128,URI=\"key.bin\"\n#EXTINF:2.0,\nseg1.m4s\n";
+        let out = rewrite_playlist(
+            media,
+            "https://manifest.googlevideo.com/a/b/index.m3u8",
+            "vid1",
+        );
         assert!(out.contains(&format!("URI=\"{}", prefix())));
         assert!(out.contains("key.bin"));
         assert!(out.contains("seg1.m4s"));

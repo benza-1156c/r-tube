@@ -23,12 +23,11 @@ pub(super) async fn handle_connection(
     let mut pending: Vec<u8> = Vec::with_capacity(2048);
 
     loop {
-        let head = match tokio::time::timeout(IDLE_TIMEOUT, read_head(&mut stream, &mut pending))
-            .await
-        {
-            Ok(Ok(Some(head))) => head,
-            _ => return Ok(()),
-        };
+        let head =
+            match tokio::time::timeout(IDLE_TIMEOUT, read_head(&mut stream, &mut pending)).await {
+                Ok(Ok(Some(head))) => head,
+                _ => return Ok(()),
+            };
 
         let req = match parse_head(&head) {
             Some(req) => req,

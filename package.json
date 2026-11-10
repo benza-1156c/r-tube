@@ -14,6 +14,7 @@
     "@tailwindcss/vite": "^4.3.5",
     "@tauri-apps/api": "^2.12.4",
     "@tauri-apps/plugin-opener": "^2.7.2",
+    "@tauri-apps/plugin-store": "~2.5.1",
     "@videojs/dash-video": "10.3.0",
     "@videojs/hlsjs-video": "10.3.0",
     "@videojs/html": "10.3.0",

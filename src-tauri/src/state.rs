@@ -1,6 +1,6 @@
+use sea_orm::DatabaseConnection;
 use std::path::PathBuf;
 use std::sync::Arc;
-use sea_orm::DatabaseConnection;
 
 use crate::services::youtube::YoutubeClient;
 

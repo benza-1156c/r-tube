@@ -52,6 +52,13 @@ const boundVideos = new WeakSet<HTMLVideoElement>();
 
 let isRecovering = false;
 
+/**
+ * Incremented by every load and by `closePlayer`. A load only publishes its
+ * result while it still owns the latest token, so a slow response can never
+ * overwrite a newer video or revive the source after the player was closed.
+ */
+let loadToken = 0;
+
 function revokeBlobUrls(): void {
   while (activeBlobUrls.length > 0) {
     const url = activeBlobUrls.pop();
@@ -94,6 +101,9 @@ export function usePlayer() {
     videoId: string,
     options: LoadOptions = {},
   ): Promise<void> {
+    const token = ++loadToken;
+    const isStale = (): boolean => token !== loadToken;
+
     status.value = "loading";
     errorMessage.value = null;
     if (!options.resumeAt) {
@@ -115,6 +125,9 @@ export function usePlayer() {
 
     try {
       const infoRes = await commands.getVideoInfo(videoId);
+      if (isStale()) {
+        return;
+      }
       if (infoRes.status !== "ok") {
         throw new Error(
           infoRes.error.message || "Failed to fetch video stream info",
@@ -140,14 +153,22 @@ export function usePlayer() {
       revokeBlobUrls();
       if (info.captions && info.captions.length > 0) {
         const loaded: CaptionOption[] = [];
+        // Kept local until the whole load succeeds: a cancelled load has to
+        // release its own object URLs instead of parking them in the shared
+        // list for a player that is no longer showing anything.
+        const createdUrls: string[] = [];
         for (const caption of info.captions) {
           try {
             const subRes = await commands.getSubtitleContent(caption.vttUrl);
+            if (isStale()) {
+              for (const url of createdUrls) URL.revokeObjectURL(url);
+              return;
+            }
             if (subRes.status === "ok" && subRes.data) {
               const blobUrl = URL.createObjectURL(
                 new Blob([subRes.data], { type: "text/vtt" }),
               );
-              activeBlobUrls.push(blobUrl);
+              createdUrls.push(blobUrl);
               loaded.push({
                 id: caption.languageCode,
                 name: caption.name,
@@ -163,6 +184,11 @@ export function usePlayer() {
             );
           }
         }
+        if (isStale()) {
+          for (const url of createdUrls) URL.revokeObjectURL(url);
+          return;
+        }
+        activeBlobUrls.push(...createdUrls);
         captionTracks.value = loaded;
       } else {
         captionTracks.value = [];
@@ -178,6 +204,8 @@ export function usePlayer() {
         video.addEventListener(
           "loadedmetadata",
           () => {
+            // The element may already be loading a newer video by now.
+            if (isStale()) return;
             video.currentTime = resumeAt;
             if (options.autoplay ?? true) {
               video.play().catch(() => {});
@@ -189,6 +217,10 @@ export function usePlayer() {
 
       currentSrc.value = info.hlsManifestUrl;
     } catch (err: unknown) {
+      // A cancelled load is not a failure: it no longer owns this player.
+      if (isStale()) {
+        return;
+      }
       console.error("Error loading video:", err);
       status.value = "error";
       errorMessage.value =
@@ -316,7 +348,17 @@ export function usePlayer() {
     }
   }
 
+  /**
+   * Close the player and release everything the stream holds.
+   *
+   * The Video.js elements themselves stay mounted (they are reused by the next
+   * video, and a destroyed element cannot be reconnected), so this only tears
+   * down the stream: the pending load is cancelled, caption object URLs are
+   * revoked, and the empty source makes the HLS adapter drop its media source
+   * and buffers.
+   */
   function closePlayer(): void {
+    loadToken++;
     isOpen.value = false;
     status.value = "idle";
     currentSrc.value = "";

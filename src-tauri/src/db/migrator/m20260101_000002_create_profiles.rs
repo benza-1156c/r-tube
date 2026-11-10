@@ -44,4 +44,3 @@ enum Profiles {
     IsActive,
     UpdatedAt,
 }
-

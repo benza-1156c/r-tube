@@ -1,7 +1,7 @@
-use std::fs;
-use std::path::Path;
 use sea_orm::{Database, DatabaseConnection, DbErr};
 use sea_orm_migration::MigratorTrait;
+use std::fs;
+use std::path::Path;
 
 use crate::db::migrator::Migrator;
 

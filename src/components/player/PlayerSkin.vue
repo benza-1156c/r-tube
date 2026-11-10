@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from "vue";
+import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { usePlayer } from "@/composables/usePlayer";
 
 import "@videojs/html/video/player";
@@ -16,10 +16,25 @@ const player = usePlayer();
  * typed as the video element it stands in for.
  */
 const videoRef = ref<HTMLVideoElement | null>(null);
+const playerRef = ref<HTMLElement | null>(null);
+
+/** Video.js elements expose `destroy()` to release their engine and store. */
+interface Destroyable {
+  destroy?: () => void;
+}
 
 onMounted(() => player.attachVideo(videoRef.value));
 
 watch(videoRef, (el) => player.attachVideo(el));
+
+onBeforeUnmount(() => {
+  // `keep-alive` opts this tree out of Video.js' automatic teardown, so the
+  // HLS engine, the store and every UI element in the skin are released here
+  // instead. Skip this and a remounted player leaves its engine behind.
+  (videoRef.value as unknown as Destroyable | null)?.destroy?.();
+  (playerRef.value as unknown as Destroyable | null)?.destroy?.();
+  player.attachVideo(null);
+});
 </script>
 
 <template>
@@ -33,6 +48,7 @@ watch(videoRef, (el) => player.attachVideo(el));
     element removed for more than two animation frames destroys itself.
   -->
   <video-player
+    ref="playerRef"
     keep-alive
     :content-title="player.currentVideo.value?.title"
     :poster="player.currentVideo.value?.thumbnailUrl"
