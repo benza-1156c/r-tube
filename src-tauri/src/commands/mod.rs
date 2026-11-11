@@ -1,5 +1,6 @@
 pub mod auth;
 pub mod profile;
+pub mod settings;
 pub mod youtube;
 
 use rtube_macros::app_command;

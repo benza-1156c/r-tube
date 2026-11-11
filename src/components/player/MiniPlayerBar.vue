@@ -25,7 +25,6 @@ const player = usePlayer();
     <button
       type="button"
       class="min-w-0 flex-1 text-left"
-      title="Open in watch page"
       @click="$emit('expand')"
     >
       <span class="block truncate text-xs font-semibold text-foreground">
@@ -40,7 +39,6 @@ const player = usePlayer();
       <button
         type="button"
         class="rounded p-1.5 text-foreground transition-colors hover:bg-accent"
-        title="Open in watch page"
         aria-label="Open in watch page"
         @click="$emit('expand')"
       >

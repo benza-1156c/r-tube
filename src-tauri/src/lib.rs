@@ -55,7 +55,10 @@ pub fn run() {
 
                 let _ = yt.init_from_active_profile(&db).await;
 
-                app_handle.manage(AppState::new(db, app_path, yt));
+                let initial_settings = models::settings::AppSettings::load_from_store(&app_handle);
+                let settings = std::sync::Arc::new(tokio::sync::RwLock::new(initial_settings));
+
+                app_handle.manage(AppState::new(db, app_path, yt, settings));
             });
 
             Ok(())

@@ -12,6 +12,7 @@ export const commands = {
 	upsertProfile: (name: string, email: string, avatarUrl: string, cookies: string) => typedError<Model, AppError_Serialize>(__TAURI_INVOKE("upsert_profile", { name, email, avatarUrl, cookies })),
 	setActiveProfile: (id: number) => typedError<Model, AppError_Serialize>(__TAURI_INVOKE("set_active_profile", { id })),
 	deleteProfile: (id: number) => typedError<boolean, AppError_Serialize>(__TAURI_INVOKE("delete_profile", { id })),
+	getSettings: () => typedError<AppSettings, AppError_Serialize>(__TAURI_INVOKE("get_settings")),
 	getHomeFeed: (continuation: string | null, params: string | null) => typedError<HomeFeed_Serialize, AppError_Serialize>(__TAURI_INVOKE("get_home_feed", { continuation, params })),
 	getSubscriptionsFeed: () => typedError<BrowseFeed_Serialize, AppError_Serialize>(__TAURI_INVOKE("get_subscriptions_feed")),
 	getTrending: () => typedError<TrendingFeed_Serialize, AppError_Serialize>(__TAURI_INVOKE("get_trending")),
@@ -28,6 +29,13 @@ export type AppError = AppError_Serialize | AppError_Deserialize;
 export type AppError_Deserialize = { type: "Database"; message: string } | { type: "NotFound"; message: string } | { type: "Validation"; message: string } | { type: "Internal"; message: string };
 
 export type AppError_Serialize = { type: "Database"; message: string } | { type: "NotFound"; message: string } | { type: "Validation"; message: string } | { type: "Internal"; message: string };
+
+export type AppSettings = {
+	volume: number | null,
+	language: string,
+	defaultResolution: string,
+	playbackMode: PlaybackMode,
+};
 
 export type BrowseFeed = BrowseFeed_Serialize | BrowseFeed_Deserialize;
 
@@ -107,6 +115,8 @@ export type Model = {
 	is_active: boolean,
 	updated_at: string,
 };
+
+export type PlaybackMode = "normal" | "audio-only";
 
 export type PlayerResponse = PlayerResponse_Serialize | PlayerResponse_Deserialize;
 

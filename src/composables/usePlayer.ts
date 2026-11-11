@@ -1,4 +1,5 @@
 import { commands, type PlayerResponse_Deserialize } from "@/bindings";
+import { useSettings } from "./useSettings";
 
 export interface CaptionOption {
   id: string;
@@ -71,16 +72,26 @@ function revokeBlobUrls(): void {
 }
 
 export function usePlayer() {
+  const { settings, updateSettings } = useSettings();
   const isPlaying = computed<boolean>(() => status.value === "playing");
 
   function attachVideo(el: MediaElement | null): void {
     videoElement.value = el;
     if (el && !boundVideos.has(el)) {
       boundVideos.add(el);
+
+      if (settings.value) {
+        el.volume = settings.value.volume || 0.75;
+      }
+
       el.addEventListener("loadeddata", () => {
         if (status.value === "loading") {
           status.value = "paused";
         }
+      });
+
+      el.addEventListener("volumechange", () => {
+        updateSettings({ volume: el.volume });
       });
     }
   }
