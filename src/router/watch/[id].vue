@@ -27,9 +27,6 @@ const player = usePlayer();
 const videoId = computed(
   () => ((route.params as Record<string, any>)?.id as string) || "",
 );
-const playlistId = computed(
-  () => (route.query as Record<string, any>)?.list as string | undefined,
-);
 
 const watchNext = ref<WatchNextResults_Deserialize | null>(null);
 const isLoadingRelated = ref(false);

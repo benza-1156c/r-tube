@@ -181,6 +181,16 @@ const settingDefinitions: AnySettingDefinition[] = [
         description: "Low bandwidth streaming",
       },
       {
+        label: "240p",
+        value: "240p",
+        description: "Low bandwidth streaming",
+      },
+      {
+        label: "144p",
+        value: "144p",
+        description: "Low bandwidth streaming",
+      },
+      {
         label: "Auto",
         value: "auto",
         description: "Automatically adapt based on available connection speed",

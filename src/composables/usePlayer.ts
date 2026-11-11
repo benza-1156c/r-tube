@@ -81,6 +81,53 @@ function revokeBlobUrls(): void {
   }
 }
 
+/**
+ * Completely stop playback, detach HLS engine, and unload media from audio pipeline.
+ */
+function stopMediaPlayback(el: HTMLVideoElement | null): void {
+  if (!el) return;
+  const customEl = el as any;
+
+  // 1. Immediately pause the custom element
+  try {
+    customEl.pause?.();
+  } catch {}
+
+  // 2. Stop and detach the underlying HLS engine so buffered audio stops playing
+  try {
+    if (customEl.engine) {
+      customEl.engine.stopLoad?.();
+      customEl.engine.detachMedia?.();
+    }
+  } catch {}
+
+  // 3. Find the internal native <video> element (in shadow root or target) and pause it
+  try {
+    const targetVideo: HTMLVideoElement | null =
+      customEl.target ||
+      customEl.shadowRoot?.querySelector("video") ||
+      (customEl.tagName?.toLowerCase() === "video" ? customEl : null);
+
+    if (targetVideo) {
+      targetVideo.pause();
+      targetVideo.src = "";
+      targetVideo.srcObject = null;
+      targetVideo.removeAttribute("src");
+      try {
+        targetVideo.load();
+      } catch {}
+    }
+  } catch {}
+
+  // 4. Clear src on the custom element itself
+  try {
+    customEl.removeAttribute?.("src");
+    if (customEl.src) {
+      customEl.src = "";
+    }
+  } catch {}
+}
+
 export function usePlayer() {
   const { settings, updateSettings } = useSettings();
   const isPlaying = computed<boolean>(() => status.value === "playing");
@@ -175,9 +222,13 @@ export function usePlayer() {
     const token = ++loadToken;
     const isStale = (): boolean => token !== loadToken;
 
-    // closePlayer();
     cancelAutoplay();
     upNextVideo.value = null;
+
+    // Immediately stop old video playback so its audio doesn't linger while fetching
+    if (videoElement.value) {
+      stopMediaPlayback(videoElement.value);
+    }
 
     // Pre-fetch the Up Next video directly from YouTube
     void commands
@@ -477,9 +528,7 @@ export function usePlayer() {
     revokeBlobUrls();
     captionTracks.value = [];
     if (videoElement.value) {
-      videoElement.value.pause();
-      videoElement.value.removeAttribute("src");
-      videoElement.value.load();
+      stopMediaPlayback(videoElement.value);
     }
   }
 
