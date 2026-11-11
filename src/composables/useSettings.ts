@@ -1,12 +1,13 @@
 import { ref } from "vue";
 import { load, type Store } from "@tauri-apps/plugin-store";
-import type { AppSettings, PlaybackMode } from "@/bindings";
+import type { AppSettings_Serialize, PlaybackMode } from "@/bindings";
 
-export type { AppSettings, PlaybackMode };
+export type AppSettings = AppSettings_Serialize;
+export type { PlaybackMode };
 
 export const defaultSettings: AppSettings = {
   volume: 1.0,
-  language: "th",
+  audioLanguage: "th",
   defaultResolution: "1080p",
   playbackMode: "normal",
 };
@@ -33,9 +34,14 @@ export function useSettings() {
   async function loadSettings(): Promise<AppSettings> {
     try {
       const store = await getStore();
-      const val = await store.get<AppSettings>(SETTINGS_KEY);
+      const val = await store.get<Record<string, any>>(SETTINGS_KEY);
       if (val) {
-        settings.value = { ...defaultSettings, ...val };
+        settings.value = {
+          volume: typeof val.volume === "number" ? val.volume : defaultSettings.volume,
+          audioLanguage: String(val.audioLanguage || val.language || defaultSettings.audioLanguage),
+          defaultResolution: String(val.defaultResolution || defaultSettings.defaultResolution),
+          playbackMode: (val.playbackMode === "audio-only" ? "audio-only" : "normal") as PlaybackMode,
+        };
       } else {
         await store.set(SETTINGS_KEY, defaultSettings);
         await store.save();

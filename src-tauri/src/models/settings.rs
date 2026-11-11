@@ -19,7 +19,8 @@ pub enum PlaybackMode {
 #[serde(rename_all = "camelCase")]
 pub struct AppSettings {
     pub volume: f64,
-    pub language: String,
+    #[serde(alias = "language")]
+    pub audio_language: String,
     pub default_resolution: String,
     pub playback_mode: PlaybackMode,
 }
@@ -28,7 +29,7 @@ impl Default for AppSettings {
     fn default() -> Self {
         Self {
             volume: 1.0,
-            language: "th".to_string(),
+            audio_language: "en".to_string(),
             default_resolution: "1080p".to_string(),
             playback_mode: PlaybackMode::Normal,
         }
@@ -58,17 +59,16 @@ impl AppSettings {
 
     /// Persist current settings to the store
     pub fn save_to_store(&self, app: &AppHandle) -> Result<(), AppError> {
-        let store = app.store(SETTINGS_STORE_PATH).map_err(|e| {
-            AppError::Internal(format!("Failed to open settings store: {e}"))
-        })?;
+        let store = app
+            .store(SETTINGS_STORE_PATH)
+            .map_err(|e| AppError::Internal(format!("Failed to open settings store: {e}")))?;
 
-        let json_val = serde_json::to_value(self)
-            .map_err(|e| AppError::Internal(e.to_string()))?;
+        let json_val = serde_json::to_value(self).map_err(|e| AppError::Internal(e.to_string()))?;
 
         store.set(SETTINGS_KEY, json_val);
-        store.save().map_err(|e| {
-            AppError::Internal(format!("Failed to save settings store: {e}"))
-        })?;
+        store
+            .save()
+            .map_err(|e| AppError::Internal(format!("Failed to save settings store: {e}")))?;
 
         Ok(())
     }

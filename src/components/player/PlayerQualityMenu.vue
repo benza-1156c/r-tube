@@ -20,8 +20,8 @@ defineOptions({ name: "PlayerQualityMenu" });
       type="button"
       variant="secondary"
       size="icon-sm"
+      class="bg-black/60 border"
       commandfor="rt-quality-menu"
-      title="Change quality"
       aria-label="Change quality"
     >
       <Settings />

@@ -93,6 +93,8 @@ export function usePlayer() {
       el.addEventListener("volumechange", () => {
         updateSettings({ volume: el.volume });
       });
+
+      el.addEventListener("loadedmetadata", () => {});
     }
   }
 
