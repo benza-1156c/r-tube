@@ -3,7 +3,7 @@ use tauri::State;
 
 use crate::error::AppError;
 use crate::models::youtube::{
-    BrowseFeed, HomeFeed, PlayerResponse, SearchResults, TrendingFeed, WatchNextResults,
+    BrowseFeed, HomeFeed, PlayerResponse, SearchResults, TrendingFeed, VideoItem, WatchNextResults,
 };
 use crate::services::youtube::CurrentUserProfile;
 use crate::state::AppState;
@@ -64,6 +64,31 @@ pub async fn get_watch_next(
 #[app_command]
 pub async fn get_account_info(state: State<'_, AppState>) -> Result<CurrentUserProfile, AppError> {
     state.yt.get_account_info().await
+}
+
+/// Record the playback event that puts a video into the watch history.
+#[app_command]
+pub async fn record_watch_start(
+    state: State<'_, AppState>,
+    video_id: String,
+) -> Result<(), AppError> {
+    state.yt.record_watch_start(&video_id).await
+}
+
+/// Report the playback position so the account remembers where it stopped.
+#[app_command]
+pub async fn update_watch_time(
+    state: State<'_, AppState>,
+    video_id: String,
+    seconds: f64,
+) -> Result<(), AppError> {
+    state.yt.record_watch_time(&video_id, seconds).await
+}
+
+/// Watch history of the signed-in account.
+#[app_command]
+pub async fn get_history(state: State<'_, AppState>) -> Result<Vec<VideoItem>, AppError> {
+    state.yt.get_history().await
 }
 
 #[app_command]

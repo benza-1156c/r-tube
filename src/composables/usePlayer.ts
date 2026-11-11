@@ -61,6 +61,10 @@ const autoplayCountdown = ref<number | null>(null);
 const isAutoplayEnabled = ref<boolean>(true);
 let autoplayTimer: ReturnType<typeof setInterval> | null = null;
 
+/** Watch-history reporting for the video that is currently playing. */
+let historyTimer: ReturnType<typeof setInterval> | null = null;
+let historyVideoId: string | null = null;
+
 let isRecovering = false;
 
 /**
@@ -191,6 +195,10 @@ export function usePlayer() {
         previous.pause();
       } catch {}
     }
+
+    // Save where the replaced video stopped, then stop reporting for it.
+    reportWatchTime();
+    stopHistoryReporting();
 
     // Pre-fetch the Up Next video directly from YouTube
     void commands
@@ -394,15 +402,77 @@ export function usePlayer() {
     }
   }
 
+  /**
+   * Report where playback currently is, so the account remembers the resume
+   * position (YouTube's watch-time event).
+   */
+  function reportWatchTime(): void {
+    const videoId = historyVideoId;
+    const element = videoElement.value;
+    if (!videoId || !element) return;
+    const seconds = element.currentTime;
+    if (!Number.isFinite(seconds) || seconds <= 0) return;
+
+    void commands
+      .updateWatchTime(videoId, Math.round(seconds * 100) / 100)
+      .then((res) => {
+        if (res.status !== "ok") {
+          console.warn("Could not update watch time:", res.error.message);
+        }
+      })
+      .catch((err) => {
+        console.warn("Could not update watch time:", err);
+      });
+  }
+
+  function stopHistoryReporting(): void {
+    if (historyTimer) {
+      clearInterval(historyTimer);
+      historyTimer = null;
+    }
+    historyVideoId = null;
+  }
+
+  /**
+   * Put the video into the account's watch history once, then keep its
+   * watch-time fresh while it plays.
+   */
+  function startHistoryReporting(videoId: string): void {
+    if (historyVideoId === videoId) return;
+
+    if (historyTimer) {
+      reportWatchTime();
+      clearInterval(historyTimer);
+      historyTimer = null;
+    }
+
+    historyVideoId = videoId;
+    void commands
+      .recordWatchStart(videoId)
+      .then((res) => {
+        if (res.status !== "ok") {
+          console.warn("Could not record watch history:", res.error.message);
+        }
+      })
+      .catch((err) => {
+        console.warn("Could not record watch history:", err);
+      });
+
+    historyTimer = setInterval(reportWatchTime, 30_000);
+  }
+
   function onPlay(): void {
     cancelAutoplay();
     status.value = "playing";
+    const videoId = currentVideo.value?.id;
+    if (videoId) startHistoryReporting(videoId);
   }
 
   function onPause(): void {
     if (status.value !== "ended") {
       status.value = "paused";
     }
+    reportWatchTime();
   }
 
   function onTimeUpdate(e: Event): void {
@@ -424,6 +494,7 @@ export function usePlayer() {
 
   function onEnded(): void {
     status.value = "ended";
+    reportWatchTime();
     if (!isAutoplayEnabled.value || !upNextVideo.value) return;
 
     cancelAutoplay();
@@ -499,6 +570,10 @@ export function usePlayer() {
     isRecovering = false;
     revokeBlobUrls();
     captionTracks.value = [];
+
+    // Remember the last position before dropping the session.
+    reportWatchTime();
+    stopHistoryReporting();
 
     // Close must not empty the media source. The HLS adapter infers the
     // content type from the URL and treats an empty one as HLS, so clearing it

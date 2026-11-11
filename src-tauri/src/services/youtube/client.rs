@@ -1,5 +1,6 @@
 ﻿use innertube_rs::{
-    BrowseFeed, HomeFeed, Innertube, SearchResults, SessionOptions, TrendingFeed, WatchNextResults,
+    BrowseFeed, HomeFeed, Innertube, SearchResults, SessionOptions, TrendingFeed, VideoInfo,
+    WatchNextResults,
 };
 use reqwest::header::HeaderMap;
 use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter};
@@ -11,7 +12,7 @@ use tokio::sync::RwLock;
 
 use crate::db::entities::profile;
 use crate::error::AppError;
-use crate::models::youtube::{CaptionTrack, PlayerResponse};
+use crate::models::youtube::{CaptionTrack, PlayerResponse, VideoItem};
 use crate::services::youtube::cookie::CookieManager;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
@@ -28,6 +29,7 @@ pub struct YoutubeClient {
     anon_innertube: Arc<Innertube>,
     pub cookie_manager: CookieManager,
     active_profile_id: Arc<RwLock<Option<i32>>>,
+    last_video_info: Arc<RwLock<Option<VideoInfo>>>,
 }
 
 impl YoutubeClient {
@@ -46,6 +48,7 @@ impl YoutubeClient {
             anon_innertube: Arc::new(anon_innertube),
             cookie_manager: CookieManager::new(None),
             active_profile_id: Arc::new(RwLock::new(None)),
+            last_video_info: Arc::new(RwLock::new(None)),
         })
     }
 
@@ -177,12 +180,19 @@ impl YoutubeClient {
 
         let raw = {
             let yt = self.innertube.read().await;
-            yt.get_video_info(video_id)
+            yt.get_basic_info(video_id, None)
                 .await
                 .map_err(|e| AppError::Internal(format!("Failed to get video info: {e}")))?
         };
 
-        let mut player_res = PlayerResponse::from(raw);
+        // Keep the playback session data (cpn + tracking URLs) for the
+        // history and watch-time events this video will report.
+        {
+            let mut cached = self.last_video_info.write().await;
+            *cached = Some(raw.clone());
+        }
+
+        let mut player_res = PlayerResponse::from(raw.player_response);
         player_res.hls_manifest_url = self
             .hls_manifest_url(video_id)
             .await
@@ -234,6 +244,55 @@ impl YoutubeClient {
         yt.get_watch_next(video_id)
             .await
             .map_err(|e| AppError::Internal(format!("Failed to get watch next details: {e}")))
+    }
+
+    /// Player session data for a video: the cached one when it matches, a
+    /// fresh one otherwise (history can be reported without a prior load).
+    async fn playback_info(&self, video_id: &str) -> Result<VideoInfo, AppError> {
+        if let Some(info) = self.last_video_info.read().await.as_ref() {
+            if info.id() == Some(video_id) {
+                return Ok(info.clone());
+            }
+        }
+
+        let yt = self.innertube.read().await;
+        let info = yt
+            .get_basic_info(video_id, None)
+            .await
+            .map_err(|e| AppError::Internal(format!("Failed to get video info: {e}")))?;
+        *self.last_video_info.write().await = Some(info.clone());
+        Ok(info)
+    }
+
+    /// Publish the initial playback event, which is what adds the video to the
+    /// signed-in account's watch history.
+    pub async fn record_watch_start(&self, video_id: &str) -> Result<(), AppError> {
+        let info = self.playback_info(video_id).await?;
+        let yt = self.innertube.read().await;
+        info.add_to_watch_history(yt.session.as_ref())
+            .await
+            .map_err(|e| AppError::Internal(format!("Failed to record watch history: {e}")))?;
+        Ok(())
+    }
+
+    /// Report playback progress so the resume position is remembered.
+    pub async fn record_watch_time(&self, video_id: &str, seconds: f64) -> Result<(), AppError> {
+        let info = self.playback_info(video_id).await?;
+        let yt = self.innertube.read().await;
+        info.update_watch_time(yt.session.as_ref(), seconds)
+            .await
+            .map_err(|e| AppError::Internal(format!("Failed to update watch time: {e}")))?;
+        Ok(())
+    }
+
+    /// Watch history of the signed-in account, newest first.
+    pub async fn get_history(&self) -> Result<Vec<VideoItem>, AppError> {
+        let yt = self.innertube.read().await;
+        let feed = yt
+            .get_history(None)
+            .await
+            .map_err(|e| AppError::Internal(format!("Failed to get watch history: {e}")))?;
+        Ok(feed.videos.iter().map(VideoItem::from).collect())
     }
 
     /// Sync Set-Cookie headers manually (e.g. from Webview or external response)

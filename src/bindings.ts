@@ -20,6 +20,12 @@ export const commands = {
 	getVideoInfo: (videoId: string) => typedError<PlayerResponse_Serialize, AppError_Serialize>(__TAURI_INVOKE("get_video_info", { videoId })),
 	getWatchNext: (videoId: string) => typedError<WatchNextResults_Serialize, AppError_Serialize>(__TAURI_INVOKE("get_watch_next", { videoId })),
 	getAccountInfo: () => typedError<CurrentUserProfile_Serialize, AppError_Serialize>(__TAURI_INVOKE("get_account_info")),
+	/**  Record the playback event that puts a video into the watch history. */
+	recordWatchStart: (videoId: string) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("record_watch_start", { videoId })),
+	/**  Report the playback position so the account remembers where it stopped. */
+	updateWatchTime: (videoId: string, seconds: number | null) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("update_watch_time", { videoId, seconds })),
+	/**  Watch history of the signed-in account. */
+	getHistory: () => typedError<VideoItem_Serialize[], AppError_Serialize>(__TAURI_INVOKE("get_history")),
 	getSubtitleContent: (url: string) => typedError<string, AppError_Serialize>(__TAURI_INVOKE("get_subtitle_content", { url })),
 };
 
