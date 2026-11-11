@@ -40,8 +40,15 @@ const watchSlotRef = ref<HTMLDivElement | null>(null);
 async function loadWatchData(id: string) {
   if (!id) return;
 
-  // Load video stream in global player
-  player.loadVideo(id);
+  const playerAlreadyHasVideo =
+    player.isOpen.value &&
+    player.currentVideo.value?.id === id &&
+    player.status.value !== "error" &&
+    (player.status.value === "loading" || Boolean(player.currentSrc.value));
+
+  if (!playerAlreadyHasVideo) {
+    player.loadVideo(id);
+  }
 
   // Fetch Watch Next results (related videos & playlist context)
   isLoadingRelated.value = true;
