@@ -60,17 +60,6 @@ async function handleLogin() {
         <Menu class="h-5 w-5" />
         <span class="sr-only">Toggle Sidebar</span>
       </Button>
-
-      <button
-        class="flex items-center gap-2 group cursor-pointer focus:outline-hidden"
-        @click="router.push('/')"
-      >
-        <span
-          class="text-lg font-bold tracking-tight text-foreground font-heading"
-        >
-          R-Tube
-        </span>
-      </button>
     </div>
 
     <!-- Center Section: Search Bar with Suggestions -->

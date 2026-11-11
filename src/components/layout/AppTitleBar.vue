@@ -37,7 +37,10 @@ function setPlaybackMode(mode: PlaybackMode): void {
 const isTauri = () => {
   return (
     typeof window !== "undefined" &&
-    Boolean((window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__)
+    Boolean(
+      (window as unknown as { __TAURI_INTERNALS__?: unknown })
+        .__TAURI_INTERNALS__,
+    )
   );
 };
 
@@ -95,10 +98,7 @@ async function handleTitleBarDblClick(e: MouseEvent) {
     </div>
 
     <!-- Center Drag Region -->
-    <div
-      data-tauri-drag-region
-      class="flex-1 h-full cursor-default"
-    />
+    <div data-tauri-drag-region class="flex-1 h-full cursor-default" />
 
     <!-- Right: Window Controls -->
     <WindowControls />
