@@ -27,7 +27,7 @@ async function handleTitleBarDblClick(e: MouseEvent) {
 <template>
   <header
     data-tauri-drag-region
-    class="flex h-8 w-full select-none items-center justify-between border-b border-border/20 bg-background/95 z-50 shrink-0"
+    class="flex h-8 w-full select-none items-center justify-between border-b border-sidebar-border bg-background/95 z-50 shrink-0"
     @dblclick="handleTitleBarDblClick"
   >
     <!-- Left: App Icon & Title -->

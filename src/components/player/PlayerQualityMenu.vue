@@ -61,7 +61,6 @@ defineOptions({ name: "PlayerQualityMenu" });
   background: hsl(var(--popover) / 0.97);
   border: 1px solid hsl(var(--border));
   border-radius: 12px;
-  box-shadow: 0 12px 32px rgb(0 0 0 / 0.45);
   backdrop-filter: blur(12px);
 }
 

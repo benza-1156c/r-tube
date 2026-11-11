@@ -58,7 +58,7 @@ function expandToWatch(): void {
       class="rt-player select-none bg-black"
       :class="
         isMini
-          ? 'rt-player--mini pointer-events-auto w-full shadow-2xl ring-1 ring-black/10 dark:ring-white/10'
+          ? 'rt-player--mini pointer-events-auto w-full shadow-2xl ring-1 ring-border'
           : 'w-full h-full'
       "
     >
@@ -110,6 +110,9 @@ function expandToWatch(): void {
  * Compact chrome buttons: one shared round button for the watch-mode overlay
  * (autoplay, minimize, quality) so they line up instead of mixing a long
  * switch pill with two differently shaped buttons.
+ *
+ * Colours come from the app's own sidebar palette (the surface these buttons
+ * sit next to), never from values picked here.
  */
 .rt-chrome-btn {
   display: inline-flex;
@@ -118,13 +121,12 @@ function expandToWatch(): void {
   justify-content: center;
   width: 2rem;
   height: 2rem;
-  color: #fff;
+  color: var(--sidebar-foreground);
   cursor: pointer;
-  background: rgb(0 0 0 / 55%);
-  border: 1px solid rgb(255 255 255 / 16%);
+  background: var(--sidebar);
+  border: 1px solid var(--sidebar-border);
   border-radius: 9999px;
-  box-shadow: 0 1px 3px rgb(0 0 0 / 35%);
-  backdrop-filter: blur(8px);
+  box-shadow: var(--shadow-sm);
   transition:
     background-color 0.15s ease,
     color 0.15s ease,
@@ -132,7 +134,8 @@ function expandToWatch(): void {
 }
 
 .rt-chrome-btn:hover {
-  background: rgb(0 0 0 / 78%);
+  background: var(--sidebar-accent);
+  color: var(--sidebar-accent-foreground);
 }
 
 .rt-chrome-btn:active {
@@ -140,17 +143,17 @@ function expandToWatch(): void {
 }
 
 .rt-chrome-btn:focus-visible {
-  outline: 2px solid #fff;
+  outline: 2px solid var(--sidebar-ring);
   outline-offset: 2px;
 }
 
 /* Autoplay reads as "off" by dimming its icon, not by changing its shape. */
 .rt-chrome-btn--off {
-  color: rgb(255 255 255 / 45%);
+  opacity: 0.55;
 }
 
 .rt-chrome-btn--off:hover {
-  color: #fff;
+  opacity: 1;
 }
 
 .rt-player__frame {
