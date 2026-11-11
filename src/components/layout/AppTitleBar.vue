@@ -4,8 +4,10 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { AudioLines, Clapperboard } from "@lucide/vue";
 import WindowControls from "@/components/layout/WindowControls.vue";
 import { useSettings, type PlaybackMode } from "@/composables/useSettings";
+import { usePlaybackModeNotice } from "@/composables/usePlaybackModeNotice";
 
 const { settings, updateSettings } = useSettings();
+const { notifyPlaybackMode } = usePlaybackModeNotice();
 
 const playbackMode = computed<PlaybackMode>(() => settings.value.playbackMode);
 
@@ -31,6 +33,9 @@ const modes: {
 
 function setPlaybackMode(mode: PlaybackMode): void {
   if (settings.value.playbackMode === mode) return;
+  // Confirm the switch on screen: the buttons themselves are too small and far
+  // from where the user is looking.
+  notifyPlaybackMode(mode);
   void updateSettings({ playbackMode: mode });
 }
 

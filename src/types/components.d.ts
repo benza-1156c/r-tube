@@ -43,6 +43,7 @@ declare module 'vue' {
     HeaderSearch: typeof import('./../components/layout/HeaderSearch.vue')['default']
     Input: typeof import('./../lib/components/ui/input/Input.vue')['default']
     MiniPlayerBar: typeof import('./../components/player/MiniPlayerBar.vue')['default']
+    PlaybackModeOsd: typeof import('./../components/layout/PlaybackModeOsd.vue')['default']
     PlayerQualityMenu: typeof import('./../components/player/PlayerQualityMenu.vue')['default']
     PlayerSkin: typeof import('./../components/player/PlayerSkin.vue')['default']
     PlaylistCard: typeof import('./../components/video/PlaylistCard.vue')['default']

@@ -2,6 +2,7 @@
 import { useRoute } from "vue-router";
 import { computed, onMounted, onBeforeUnmount } from "vue";
 import AppTitleBar from "@/components/layout/AppTitleBar.vue";
+import PlaybackModeOsd from "@/components/layout/PlaybackModeOsd.vue";
 import GlobalVideoPlayer from "@/components/player/GlobalVideoPlayer.vue";
 import { useMiniPlayerDraggable } from "@/composables/useMiniPlayerDraggable";
 
@@ -54,6 +55,9 @@ onBeforeUnmount(() => {
       >
         <GlobalVideoPlayer />
       </div>
+
+      <!-- Transient confirmation when the playback mode is switched. -->
+      <PlaybackModeOsd />
     </SidebarProvider>
   </div>
 </template>
