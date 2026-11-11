@@ -27,16 +27,16 @@ const isMix = computed(() => {
 const queueTitle = computed(() => {
   if (isMix.value) {
     const seedTitle = props.items[0]?.title || props.currentTitle || "";
-    return `มิกซ์ - ${seedTitle}`;
+    return `Mix - ${seedTitle}`;
   }
-  return props.currentTitle || "เพลย์ลิสต์";
+  return props.currentTitle || "Playlist";
 });
 
 const queueSubtitle = computed(() => {
   if (isMix.value) {
-    return "มิกซ์คือเพลย์ลิสต์ที่ YouTube สร้างให้คุณ";
+    return "YouTube Mix created for you";
   }
-  return `${props.items.length} วิดีโอ`;
+  return `${props.items.length} tracks`;
 });
 
 const currentIndex = computed(() => {

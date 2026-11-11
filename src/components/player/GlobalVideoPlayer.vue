@@ -68,7 +68,7 @@ function expandToWatch(): void {
       class="rt-player select-none bg-black"
       :class="[
         isListenPage
-          ? 'fixed -left-[9999px] -top-[9999px] w-1 h-1 opacity-0 pointer-events-none overflow-hidden'
+          ? 'fixed left-[-9999px] top-[-9999px] w-0 h-0 opacity-0 pointer-events-none overflow-hidden'
           : isMini
             ? 'rt-player--mini pointer-events-auto w-full shadow-2xl ring-1 ring-border'
             : 'w-full h-full',
@@ -78,7 +78,7 @@ function expandToWatch(): void {
         class="rt-player__frame aspect-video w-full"
         :class="{
           'sr-only opacity-0 h-0 aspect-auto overflow-hidden pointer-events-none':
-            isMini && isAudioOnly,
+            isListenPage || (isMini && isAudioOnly),
         }"
       >
         <PlayerSkin>

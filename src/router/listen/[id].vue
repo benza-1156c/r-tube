@@ -8,26 +8,13 @@ import {
   type VideoItem_Deserialize,
   type WatchNextResults_Deserialize,
 } from "@/bindings";
-import WatchPlaylistQueue from "@/components/playlist/WatchPlaylistQueue.vue";
-import {
-  Play,
-  Pause,
-  SkipBack,
-  SkipForward,
-  Volume2,
-  VolumeX,
-  Volume1,
-  AudioLines,
-  Clapperboard,
-  ThumbsUp,
-  Share2,
-  Bookmark,
-  CheckCircle2,
-  Loader2,
-  ListMusic,
-  ChevronDown,
-  ChevronUp,
-} from "@lucide/vue";
+
+import ListenArtwork from "@/components/listen/ListenArtwork.vue";
+import ListenTrackInfo from "@/components/listen/ListenTrackInfo.vue";
+import ListenControls from "@/components/listen/ListenControls.vue";
+import ListenRelated from "@/components/listen/ListenRelated.vue";
+
+import { ChevronDown, ChevronUp } from "@lucide/vue";
 
 defineOptions({ name: "ListenPage" });
 
@@ -58,13 +45,8 @@ const watchNext = ref<WatchNextResults_Deserialize | null>(null);
 const isLoadingRelated = ref(false);
 const isDescriptionExpanded = ref(false);
 
-const isSeeking = ref(false);
-const seekPosition = ref(0);
-
 const duration = computed(() => player.currentVideo.value?.duration || 0);
-const currentTime = computed(() =>
-  isSeeking.value ? seekPosition.value : player.currentTime.value,
-);
+const currentTime = computed(() => player.currentTime.value);
 
 const currentThumbnail = computed(() => {
   return (
@@ -75,23 +57,19 @@ const currentThumbnail = computed(() => {
   );
 });
 
-function formatTime(seconds: number): string {
-  if (!seconds || isNaN(seconds) || seconds < 0) return "0:00";
-  const sec = Math.floor(seconds);
-  const m = Math.floor(sec / 60);
-  const s = sec % 60;
-  if (m >= 60) {
-    const h = Math.floor(m / 60);
-    const remM = m % 60;
-    return `${h}:${remM.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+function applyAudioOnlyOptimization() {
+  const el = player.videoElement.value as any;
+  if (!el) return;
+  const renditions = el.videoRenditions;
+  if (renditions && renditions.length > 0) {
+    // Select lowest video rendition to minimize bandwidth and memory footprint
+    renditions.selectedIndex = 0;
   }
-  return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
 async function loadListenData(id: string) {
   if (!id) return;
 
-  // Make sure player is loading/playing this video
   const playerAlreadyHasVideo =
     player.isOpen.value &&
     player.currentVideo.value?.id === id &&
@@ -145,11 +123,12 @@ async function loadListenData(id: string) {
     console.warn("Failed to load listen details:", err);
   } finally {
     isLoadingRelated.value = false;
+    applyAudioOnlyOptimization();
   }
 }
 
 onMounted(() => {
-  // If settings indicate normal mode, route to watch page instead
+  // If settings indicate normal mode, redirect to watch page
   if (settings.value.playbackMode === "normal" && videoId.value) {
     router.replace({
       path: `/watch/${videoId.value}`,
@@ -186,26 +165,10 @@ watch(
   },
 );
 
-function switchToVideo() {
-  void updateSettings({ playbackMode: "normal" });
-  router.push({
-    path: `/watch/${videoId.value}`,
-    query: route.query,
-  });
-}
-
-function handleSeekInput(e: Event) {
-  isSeeking.value = true;
-  seekPosition.value = Number((e.target as HTMLInputElement).value);
-}
-
-function handleSeekChange(e: Event) {
-  const targetTime = Number((e.target as HTMLInputElement).value);
+function handleSeek(targetTime: number) {
   if (player.videoElement.value) {
     player.videoElement.value.currentTime = targetTime;
   }
-  seekPosition.value = targetTime;
-  isSeeking.value = false;
 }
 
 function handlePrevious() {
@@ -260,8 +223,7 @@ function handleNext() {
   player.playNext();
 }
 
-function handleVolumeChange(e: Event) {
-  const val = Number((e.target as HTMLInputElement).value);
+function handleVolumeChange(val: number) {
   if (player.videoElement.value) {
     player.videoElement.value.volume = val;
   }
@@ -300,213 +262,52 @@ function selectRelated(item: VideoItem_Deserialize) {
       :style="{ backgroundImage: `url(${currentThumbnail})` }"
     />
 
-    <!-- Main Layout: Player Center + Queue/Related on Right -->
+    <!-- Main Layout: Player Column + Queue/Related Column -->
     <div class="flex flex-col lg:flex-row gap-8">
       <!-- Left Column: Audio Artwork & Controls -->
       <div class="flex-1 flex flex-col items-center max-w-2xl mx-auto w-full">
-        <!-- Top Mode Banner -->
-        <div class="w-full flex items-center justify-between mb-4">
-          <div
-            class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-xs font-semibold select-none"
-          >
-            <AudioLines class="h-3.5 w-3.5" />
-            <span>โหมดฟังเพลงเท่านั้น</span>
-          </div>
+        <!-- Album Artwork Cover -->
+        <ListenArtwork
+          :thumbnail-url="currentThumbnail"
+          :title="player.currentVideo.value?.title"
+          :is-playing="player.isPlaying.value"
+        />
 
-          <button
-            type="button"
-            class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-muted hover:bg-muted/80 text-foreground text-xs font-medium border border-border/50 transition-colors cursor-pointer select-none"
-            @click="switchToVideo"
-          >
-            <Clapperboard class="h-3.5 w-3.5 text-muted-foreground" />
-            <span>สลับไปดูวิดีโอ</span>
-          </button>
-        </div>
+        <!-- Track Info & Actions (All in English) -->
+        <ListenTrackInfo
+          :title="
+            (player.currentVideo.value?.title || watchNext?.currentTitle) ??
+            undefined
+          "
+          :author="
+            (player.currentVideo.value?.channelName ||
+              watchNext?.currentAuthor) ??
+            undefined
+          "
+          :avatar-url="player.currentVideo.value?.channelAvatarUrl"
+          :is-verified="false"
+        />
 
-        <!-- Album Artwork (Square Cover with glow) -->
-        <div class="relative w-64 h-64 sm:w-80 sm:h-80 md:w-96 md:h-96 my-4">
-          <div
-            v-if="currentThumbnail"
-            class="absolute inset-0 rounded-3xl bg-cover bg-center blur-2xl opacity-40 scale-95 -z-10"
-            :style="{ backgroundImage: `url(${currentThumbnail})` }"
-          />
+        <!-- Audio Scrubber & Playback Controls -->
+        <ListenControls
+          :current-time="currentTime"
+          :duration="duration"
+          :is-playing="player.isPlaying.value"
+          :is-loading="
+            player.status.value === 'loading' ||
+            player.status.value === 'buffering'
+          "
+          :volume="settings.volume ?? 1"
+          :is-muted="Boolean(player.videoElement.value?.muted)"
+          @seek="handleSeek"
+          @toggle-play="player.togglePlay"
+          @previous="handlePrevious"
+          @next="handleNext"
+          @volume-change="handleVolumeChange"
+          @toggle-mute="toggleMute"
+        />
 
-          <img
-            v-if="currentThumbnail"
-            :src="currentThumbnail"
-            :alt="player.currentVideo.value?.title || 'Track Cover'"
-            class="w-full h-full object-cover rounded-3xl shadow-2xl ring-1 ring-border/50 select-none"
-            :class="{
-              'scale-[1.01] transition-transform duration-500':
-                player.isPlaying.value,
-            }"
-          />
-          <div
-            v-else
-            class="w-full h-full rounded-3xl bg-muted flex items-center justify-center shadow-xl ring-1 ring-border/50"
-          >
-            <ListMusic class="h-16 w-16 text-muted-foreground/50" />
-          </div>
-        </div>
-
-        <!-- Track Info -->
-        <div class="w-full text-center mt-4">
-          <h1
-            class="text-xl sm:text-2xl font-bold text-foreground leading-snug line-clamp-2"
-            :title="
-              player.currentVideo.value?.title ||
-              watchNext?.currentTitle ||
-              'Loading...'
-            "
-          >
-            {{
-              player.currentVideo.value?.title ||
-              watchNext?.currentTitle ||
-              "Loading audio..."
-            }}
-          </h1>
-
-          <div
-            class="flex items-center justify-center gap-2 mt-2 text-sm text-muted-foreground"
-          >
-            <span class="font-medium hover:text-foreground transition-colors">{{
-              player.currentVideo.value?.channelName ||
-              watchNext?.currentAuthor ||
-              "Artist"
-            }}</span>
-            <CheckCircle2
-              class="h-3.5 w-3.5 text-muted-foreground fill-muted-foreground/30"
-            />
-          </div>
-        </div>
-
-        <!-- Action Buttons (Like / Share / Save) -->
-        <div class="flex items-center justify-center gap-2 mt-4 select-none">
-          <button
-            type="button"
-            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-muted/60 hover:bg-muted text-xs font-medium text-foreground transition-colors cursor-pointer"
-          >
-            <ThumbsUp class="h-3.5 w-3.5" />
-            <span>ถูกใจ</span>
-          </button>
-          <button
-            type="button"
-            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-muted/60 hover:bg-muted text-xs font-medium text-foreground transition-colors cursor-pointer"
-          >
-            <Share2 class="h-3.5 w-3.5" />
-            <span>แชร์</span>
-          </button>
-          <button
-            type="button"
-            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-muted/60 hover:bg-muted text-xs font-medium text-foreground transition-colors cursor-pointer"
-          >
-            <Bookmark class="h-3.5 w-3.5" />
-            <span>บันทึก</span>
-          </button>
-        </div>
-
-        <!-- Scrubber Progress Bar -->
-        <div class="w-full mt-6 px-2 select-none">
-          <div class="relative flex items-center group">
-            <input
-              type="range"
-              min="0"
-              :max="duration || 100"
-              :value="currentTime"
-              step="0.5"
-              class="w-full h-1.5 bg-muted rounded-lg appearance-none cursor-pointer accent-primary group-hover:h-2 transition-all"
-              @input="handleSeekInput"
-              @change="handleSeekChange"
-            />
-          </div>
-
-          <div
-            class="flex justify-between text-xs text-muted-foreground font-mono mt-1.5"
-          >
-            <span>{{ formatTime(currentTime) }}</span>
-            <span>{{ formatTime(duration) }}</span>
-          </div>
-        </div>
-
-        <!-- Audio Playback Controls -->
-        <div
-          class="flex items-center justify-center gap-6 mt-4 select-none w-full"
-        >
-          <!-- Previous Track -->
-          <button
-            type="button"
-            class="p-2.5 rounded-full text-foreground/80 hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
-            title="Previous"
-            @click="handlePrevious"
-          >
-            <SkipBack class="h-5 w-5" />
-          </button>
-
-          <!-- Play / Pause Button -->
-          <button
-            type="button"
-            class="h-14 w-14 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:scale-105 active:scale-95 transition-transform shadow-lg cursor-pointer"
-            title="Play / Pause"
-            @click="player.togglePlay"
-          >
-            <Loader2
-              v-if="
-                player.status.value === 'loading' ||
-                player.status.value === 'buffering'
-              "
-              class="h-6 w-6 animate-spin text-primary-foreground"
-            />
-            <Pause
-              v-else-if="player.isPlaying.value"
-              class="h-6 w-6 fill-current"
-            />
-            <Play v-else class="h-6 w-6 fill-current translate-x-0.5" />
-          </button>
-
-          <!-- Next Track -->
-          <button
-            type="button"
-            class="p-2.5 rounded-full text-foreground/80 hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
-            title="Next"
-            @click="handleNext"
-          >
-            <SkipForward class="h-5 w-5" />
-          </button>
-        </div>
-
-        <!-- Volume Control Row -->
-        <div class="flex items-center gap-3 mt-4 w-48 text-muted-foreground">
-          <button
-            type="button"
-            class="p-1 hover:text-foreground transition-colors cursor-pointer"
-            @click="toggleMute"
-          >
-            <VolumeX
-              v-if="
-                player.videoElement.value?.muted ||
-                (settings.volume ?? 1) === 0
-              "
-              class="h-4 w-4"
-            />
-            <Volume1
-              v-else-if="(settings.volume ?? 1) < 0.5"
-              class="h-4 w-4"
-            />
-            <Volume2 v-else class="h-4 w-4" />
-          </button>
-
-          <input
-            type="range"
-            min="0"
-            max="1"
-            step="0.01"
-            :value="settings.volume ?? 1"
-            class="w-full h-1 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
-            @input="handleVolumeChange"
-          />
-        </div>
-
-        <!-- Description Box -->
+        <!-- Description Box (English Labels) -->
         <div
           v-if="player.currentVideo.value?.description"
           class="w-full rounded-2xl bg-muted/30 border border-border/40 p-4 mt-8 text-xs leading-relaxed text-foreground/80 transition-all select-none"
@@ -550,68 +351,13 @@ function selectRelated(item: VideoItem_Deserialize) {
           :current-title="watchNext.currentTitle"
         />
 
-        <div class="flex items-center justify-between">
-          <h2 class="font-semibold text-sm text-foreground">เพลงถัดไป</h2>
-          <Loader2
-            v-if="isLoadingRelated"
-            class="h-4 w-4 text-muted-foreground animate-spin"
-          />
-        </div>
-
-        <!-- Related Tracks List -->
-        <div class="flex flex-col gap-2.5">
-          <div
-            v-for="item in watchNext?.relatedVideos || []"
-            :key="item.id"
-            class="flex gap-3 group cursor-pointer hover:bg-muted/40 p-2 rounded-xl transition-colors select-none"
-            @click="selectRelated(item)"
-          >
-            <!-- Thumbnail -->
-            <div
-              class="relative aspect-video w-32 shrink-0 overflow-hidden rounded-lg bg-muted shadow-2xs"
-            >
-              <img
-                :src="item.thumbnailUrl"
-                :alt="item.title"
-                class="h-full w-full object-cover group-hover:scale-105 transition-transform"
-                loading="lazy"
-              />
-              <span
-                v-if="item.duration"
-                class="absolute bottom-1 right-1 rounded-sm bg-black/80 px-1 text-[10px] text-white flex items-center gap-0.5"
-              >
-                <ListMusic
-                  v-if="item.playlistId || item.duration === 'Mix'"
-                  class="h-2.5 w-2.5"
-                />
-                {{ item.duration }}
-              </span>
-            </div>
-
-            <!-- Info -->
-            <div class="flex flex-col min-w-0 flex-1 justify-center">
-              <h3
-                class="line-clamp-2 text-xs font-semibold leading-snug text-foreground group-hover:text-primary transition-colors"
-                :title="item.title"
-              >
-                {{ item.title }}
-              </h3>
-              <p class="text-[11px] text-muted-foreground mt-1 truncate">
-                {{ item.channelName }}
-              </p>
-              <div
-                v-if="item.viewCount || item.publishedAt"
-                class="text-[10px] text-muted-foreground/80 flex items-center gap-1 mt-0.5"
-              >
-                <span v-if="item.viewCount">{{ item.viewCount }}</span>
-                <span v-if="item.viewCount && item.publishedAt">•</span>
-                <span v-if="item.publishedAt">{{ item.publishedAt }}</span>
-              </div>
-            </div>
-          </div>
-        </div>
+        <!-- Related Tracks (English Labels) -->
+        <ListenRelated
+          :items="watchNext?.relatedVideos || []"
+          :is-loading="isLoadingRelated"
+          @select="selectRelated"
+        />
       </div>
     </div>
   </div>
 </template>
-
