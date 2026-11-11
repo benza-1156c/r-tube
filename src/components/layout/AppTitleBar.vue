@@ -2,7 +2,7 @@
 import { computed } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { AudioLines, Clapperboard } from "@lucide/vue";
+import { ArrowLeft, AudioLines, Clapperboard } from "@lucide/vue";
 import WindowControls from "@/components/layout/WindowControls.vue";
 import { useSettings, type PlaybackMode } from "@/composables/useSettings";
 import { usePlaybackModeNotice } from "@/composables/usePlaybackModeNotice";
@@ -67,6 +67,14 @@ function setPlaybackMode(mode: PlaybackMode): void {
   }
 }
 
+function goBack(): void {
+  if (window.history.length > 1) {
+    router.back();
+  } else {
+    void router.push("/");
+  }
+}
+
 const isTauri = () => {
   return (
     typeof window !== "undefined" &&
@@ -98,12 +106,22 @@ async function handleTitleBarDblClick(e: MouseEvent) {
     class="flex h-8 w-full select-none items-center justify-between border-b border-sidebar-border bg-background/95 z-50 shrink-0"
     @dblclick="handleTitleBarDblClick"
   >
-    <!-- Left: playback mode (video / audio only) -->
+    <!-- Left: back + playback mode (video / audio only) -->
     <div
       data-tauri-drag-region="false"
-      class="flex h-full items-center px-2"
+      class="flex h-full items-center gap-1 px-2"
       @mousedown.stop
     >
+      <button
+        type="button"
+        title="Back"
+        aria-label="Back"
+        class="inline-flex h-6 w-6 cursor-pointer items-center justify-center rounded text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+        @click="goBack"
+      >
+        <ArrowLeft class="h-3.5 w-3.5" />
+      </button>
+
       <div
         class="inline-flex items-center gap-0.5 rounded-md p-0.5"
         role="group"
