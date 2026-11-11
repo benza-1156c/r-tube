@@ -17,7 +17,7 @@ export const commands = {
 	getSubscriptionsFeed: () => typedError<BrowseFeed_Serialize, AppError_Serialize>(__TAURI_INVOKE("get_subscriptions_feed")),
 	getTrending: () => typedError<TrendingFeed_Serialize, AppError_Serialize>(__TAURI_INVOKE("get_trending")),
 	search: (query: string, continuation: string | null) => typedError<SearchResults_Serialize, AppError_Serialize>(__TAURI_INVOKE("search", { query, continuation })),
-	getSearchSuggestions: (query: string) => typedError<string[], AppError_Serialize>(__TAURI_INVOKE("get_search_suggestions", { query })),
+	getSearchSuggestions: (query: string) => typedError<SearchSuggestionItem_Serialize[], AppError_Serialize>(__TAURI_INVOKE("get_search_suggestions", { query })),
 	getVideoInfo: (videoId: string) => typedError<PlayerResponse_Serialize, AppError_Serialize>(__TAURI_INVOKE("get_video_info", { videoId })),
 	getWatchNext: (videoId: string) => typedError<WatchNextResults_Serialize, AppError_Serialize>(__TAURI_INVOKE("get_watch_next", { videoId })),
 	getAccountInfo: () => typedError<CurrentUserProfile_Serialize, AppError_Serialize>(__TAURI_INVOKE("get_account_info")),
@@ -219,6 +219,22 @@ export type SearchResults_Serialize = {
 	videos: VideoItem_Serialize[],
 	playlists: PlaylistItem_Serialize[],
 	continuationToken: string | null,
+};
+
+export type SearchSuggestionItem = SearchSuggestionItem_Serialize | SearchSuggestionItem_Deserialize;
+
+export type SearchSuggestionItem_Deserialize = {
+	text: string,
+	subtitle?: string | null,
+	thumbnail?: string | null,
+	isHistory: boolean,
+};
+
+export type SearchSuggestionItem_Serialize = {
+	text: string,
+	subtitle: string | null,
+	thumbnail: string | null,
+	isHistory: boolean,
 };
 
 export type TrendingFeed = TrendingFeed_Serialize | TrendingFeed_Deserialize;
