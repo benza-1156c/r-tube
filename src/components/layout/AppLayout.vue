@@ -1,12 +1,23 @@
 <script setup lang="ts">
 import { useRoute } from "vue-router";
-import { computed } from "vue";
+import { computed, onMounted, onBeforeUnmount } from "vue";
 import GlobalVideoPlayer from "@/components/player/GlobalVideoPlayer.vue";
+import { useMiniPlayerDraggable } from "@/composables/useMiniPlayerDraggable";
 
 const route = useRoute();
 
 const shouldHideSidebar = computed(() => Boolean(route.meta.hideSidebar));
 const shouldHideHeader = computed(() => Boolean(route.meta.hideHeader));
+
+const { position, hostStyle, clampToViewport } = useMiniPlayerDraggable();
+
+onMounted(() => {
+  window.addEventListener("resize", clampToViewport);
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener("resize", clampToViewport);
+});
 </script>
 
 <template>
@@ -30,7 +41,9 @@ const shouldHideHeader = computed(() => Boolean(route.meta.hideHeader));
 
     <div
       id="mini-player-host"
-      class="pointer-events-none fixed bottom-5 right-5 z-50 w-96 max-w-[calc(100vw-2.5rem)]"
+      class="pointer-events-none fixed z-50 w-96 max-w-[calc(100vw-2.5rem)]"
+      :class="{ 'bottom-5 right-5': !position }"
+      :style="hostStyle"
     >
       <GlobalVideoPlayer />
     </div>

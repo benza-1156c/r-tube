@@ -94,7 +94,20 @@ export function usePlayer() {
         updateSettings({ volume: el.volume });
       });
 
-      el.addEventListener("loadedmetadata", () => {});
+      const applyResolution = () => {
+        const pref = settings.value?.defaultResolution;
+        const renditions = (el as any).videoRenditions;
+        if (!renditions || !pref || pref === "auto") return;
+        const target = parseInt(pref, 10);
+        const list = Array.from(renditions) as any[];
+        const idx = list.findIndex((r) => r.height === target);
+        const chosen =
+          idx !== -1 ? idx : list.findIndex((r) => r.height <= target);
+        if (chosen !== -1) renditions.selectedIndex = chosen;
+      };
+
+      el.addEventListener("loadedmetadata", applyResolution);
+      el.addEventListener("loadeddata", applyResolution);
     }
   }
 

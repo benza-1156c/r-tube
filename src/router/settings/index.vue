@@ -370,7 +370,7 @@ onMounted(async () => {
           <!-- Controls by Type -->
           <div class="sm:shrink-0 flex items-center">
             <!-- ── A. SELECT DROPDOWN ── -->
-            <div v-if="item.type === 'select'" class="relative min-w-[12rem]">
+            <div v-if="item.type === 'select'" class="relative min-w-48">
               <select
                 :value="settings[item.key]"
                 class="w-full h-9 px-3 rounded-lg border border-border bg-background text-sm font-medium text-foreground focus:outline-hidden focus:ring-2 focus:ring-primary/40 cursor-pointer transition-shadow"
