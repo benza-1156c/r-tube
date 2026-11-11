@@ -97,7 +97,7 @@ const moreItems = [
 <template>
   <Sidebar
     collapsible="icon"
-    class="border-r border-border/40 overflow-hidden h-full flex flex-col"
+    class="top-8 border-r border-border/20 overflow-hidden flex flex-col"
   >
     <!-- ── FIXED TOP AREA: MAIN & LIBRARY (ไม่เลื่อน) ── -->
     <SidebarHeader class="p-0 gap-0 shrink-0 pt-2">

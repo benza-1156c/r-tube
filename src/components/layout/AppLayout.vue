@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useRoute } from "vue-router";
 import { computed, onMounted, onBeforeUnmount } from "vue";
+import AppTitleBar from "@/components/layout/AppTitleBar.vue";
 import GlobalVideoPlayer from "@/components/player/GlobalVideoPlayer.vue";
 import { useMiniPlayerDraggable } from "@/composables/useMiniPlayerDraggable";
 
@@ -21,31 +22,38 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <SidebarProvider
-    :default-open="true"
-    class="min-h-screen w-full bg-background text-foreground"
+  <div
+    class="flex flex-col h-screen w-full overflow-hidden bg-background text-foreground"
   >
-    <AppSidebar v-if="!shouldHideSidebar" />
+    <!-- Dedicated Top Titlebar separated from everything -->
+    <AppTitleBar />
 
-    <SidebarInset class="flex flex-col flex-1 min-w-0 overflow-hidden">
-      <AppHeader v-if="!shouldHideHeader" :hide-sidebar="shouldHideSidebar" />
-
-      <main class="flex-1 overflow-y-auto">
-        <router-view v-slot="{ Component }">
-          <keep-alive exclude="WatchPage">
-            <component :is="Component" />
-          </keep-alive>
-        </router-view>
-      </main>
-    </SidebarInset>
-
-    <div
-      id="mini-player-host"
-      class="pointer-events-none fixed z-50 w-96 max-w-[calc(100vw-2.5rem)]"
-      :class="{ 'bottom-5 right-5': !position }"
-      :style="hostStyle"
+    <SidebarProvider
+      :default-open="true"
+      class="h-[calc(100svh-2rem)]! flex-1 min-h-0 w-full overflow-hidden"
     >
-      <GlobalVideoPlayer />
-    </div>
-  </SidebarProvider>
+      <AppSidebar v-if="!shouldHideSidebar" />
+
+      <SidebarInset class="flex flex-col flex-1 min-w-0 overflow-hidden">
+        <AppHeader v-if="!shouldHideHeader" :hide-sidebar="shouldHideSidebar" />
+
+        <main class="flex-1 overflow-y-auto">
+          <router-view v-slot="{ Component }">
+            <keep-alive exclude="WatchPage">
+              <component :is="Component" />
+            </keep-alive>
+          </router-view>
+        </main>
+      </SidebarInset>
+
+      <div
+        id="mini-player-host"
+        class="pointer-events-none fixed z-50 w-96 max-w-[calc(100vw-2.5rem)]"
+        :class="{ 'bottom-5 right-5': !position }"
+        :style="hostStyle"
+      >
+        <GlobalVideoPlayer />
+      </div>
+    </SidebarProvider>
+  </div>
 </template>

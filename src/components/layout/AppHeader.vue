@@ -53,7 +53,7 @@ function clearSearch() {
 
 <template>
   <header
-    class="sticky top-0 z-40 flex h-14 w-full items-center justify-between border-b border-border/40 bg-background/95 px-4 backdrop-blur-md"
+    class="sticky top-0 z-40 flex h-14 w-full items-center justify-between border-b border-border/20 bg-background/95 px-4 backdrop-blur-md"
   >
     <!-- Left Section: Toggle & Logo -->
     <div class="flex items-center gap-3">

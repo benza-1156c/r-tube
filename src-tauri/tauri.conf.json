@@ -14,7 +14,8 @@
       {
         "title": "r-tube",
         "width": 1300,
-        "height": 700
+        "height": 700,
+        "decorations": false
       }
     ],
     "security": {

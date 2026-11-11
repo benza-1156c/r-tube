@@ -14,6 +14,7 @@ declare module 'vue' {
     AppHeader: typeof import('./../components/layout/AppHeader.vue')['default']
     AppLayout: typeof import('./../components/layout/AppLayout.vue')['default']
     AppSidebar: typeof import('./../components/layout/AppSidebar.vue')['default']
+    AppTitleBar: typeof import('./../components/layout/AppTitleBar.vue')['default']
     AutoplayNextOverlay: typeof import('./../components/player/AutoplayNextOverlay.vue')['default']
     Button: typeof import('./../lib/components/ui/button/Button.vue')['default']
     Card: typeof import('./../lib/components/ui/card/Card.vue')['default']
@@ -92,5 +93,6 @@ declare module 'vue' {
     VideoFeed: typeof import('./../components/video/VideoFeed.vue')['default']
     VideoGrid: typeof import('./../components/video/VideoGrid.vue')['default']
     WatchPlayerChrome: typeof import('./../components/player/WatchPlayerChrome.vue')['default']
+    WindowControls: typeof import('./../components/layout/WindowControls.vue')['default']
   }
 }
