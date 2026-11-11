@@ -106,6 +106,53 @@ function expandToWatch(): void {
   --rt-player-radius: 8px;
 }
 
+/*
+ * Compact chrome buttons: one shared round button for the watch-mode overlay
+ * (autoplay, minimize, quality) so they line up instead of mixing a long
+ * switch pill with two differently shaped buttons.
+ */
+.rt-chrome-btn {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  color: #fff;
+  cursor: pointer;
+  background: rgb(0 0 0 / 55%);
+  border: 1px solid rgb(255 255 255 / 16%);
+  border-radius: 9999px;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 35%);
+  backdrop-filter: blur(8px);
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease,
+    transform 0.15s ease;
+}
+
+.rt-chrome-btn:hover {
+  background: rgb(0 0 0 / 78%);
+}
+
+.rt-chrome-btn:active {
+  transform: scale(0.94);
+}
+
+.rt-chrome-btn:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+/* Autoplay reads as "off" by dimming its icon, not by changing its shape. */
+.rt-chrome-btn--off {
+  color: rgb(255 255 255 / 45%);
+}
+
+.rt-chrome-btn--off:hover {
+  color: #fff;
+}
+
 .rt-player__frame {
   position: relative;
   width: 100%;

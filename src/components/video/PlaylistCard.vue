@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { PlaylistItem } from "@/bindings";
-import { usePlayer } from "@/composables/usePlayer";
 import { Play, ListMusic } from "@lucide/vue";
 
 const props = defineProps<{
@@ -8,10 +7,8 @@ const props = defineProps<{
 }>();
 
 const router = useRouter();
-const { closePlayer } = usePlayer();
 
 function openPlaylist() {
-  closePlayer();
   const videoId = props.playlist.firstVideoId || props.playlist.id;
   router.push({
     path: `/watch/${videoId}`,

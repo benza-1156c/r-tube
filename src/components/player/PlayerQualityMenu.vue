@@ -16,16 +16,15 @@ defineOptions({ name: "PlayerQualityMenu" });
     is hidden when the engine exposes no renditions to switch between.
   -->
   <div class="quality-menu-bar flex items-center" @click.stop>
-    <Button
+    <button
       type="button"
-      variant="secondary"
-      size="icon-sm"
-      class="bg-black/60 border"
+      class="rt-chrome-btn"
       commandfor="rt-quality-menu"
+      title="Quality"
       aria-label="Change quality"
     >
-      <Settings />
-    </Button>
+      <Settings class="h-4 w-4" />
+    </button>
 
     <media-menu
       id="rt-quality-menu"

@@ -81,53 +81,6 @@ function revokeBlobUrls(): void {
   }
 }
 
-/**
- * Completely stop playback, detach HLS engine, and unload media from audio pipeline.
- */
-function stopMediaPlayback(el: HTMLVideoElement | null): void {
-  if (!el) return;
-  const customEl = el as any;
-
-  // 1. Immediately pause the custom element
-  try {
-    customEl.pause?.();
-  } catch {}
-
-  // 2. Stop and detach the underlying HLS engine so buffered audio stops playing
-  try {
-    if (customEl.engine) {
-      customEl.engine.stopLoad?.();
-      customEl.engine.detachMedia?.();
-    }
-  } catch {}
-
-  // 3. Find the internal native <video> element (in shadow root or target) and pause it
-  try {
-    const targetVideo: HTMLVideoElement | null =
-      customEl.target ||
-      customEl.shadowRoot?.querySelector("video") ||
-      (customEl.tagName?.toLowerCase() === "video" ? customEl : null);
-
-    if (targetVideo) {
-      targetVideo.pause();
-      targetVideo.src = "";
-      targetVideo.srcObject = null;
-      targetVideo.removeAttribute("src");
-      try {
-        targetVideo.load();
-      } catch {}
-    }
-  } catch {}
-
-  // 4. Clear src on the custom element itself
-  try {
-    customEl.removeAttribute?.("src");
-    if (customEl.src) {
-      customEl.src = "";
-    }
-  } catch {}
-}
-
 export function usePlayer() {
   const { settings, updateSettings } = useSettings();
   const isPlaying = computed<boolean>(() => status.value === "playing");
@@ -489,7 +442,7 @@ export function usePlayer() {
   }
 
   function onError(e: Event | unknown): void {
-    if (!currentSrc.value) {
+    if (!currentSrc.value || !isOpen.value) {
       return;
     }
     // Switching videos tears the old stream down, and that teardown can emit a
@@ -542,13 +495,24 @@ export function usePlayer() {
     loadToken++;
     isOpen.value = false;
     status.value = "idle";
-    currentSrc.value = "";
     currentVideo.value = null;
     isRecovering = false;
     revokeBlobUrls();
     captionTracks.value = [];
-    if (videoElement.value) {
-      stopMediaPlayback(videoElement.value);
+
+    // Close must not empty the media source. The HLS adapter infers the
+    // content type from the URL and treats an empty one as HLS, so clearing it
+    // made hls.js fetch the page URL as a playlist and fail with
+    // "no EXTM3U delimiter" — the error dialog users saw when switching video.
+    // Pausing and stopping the load keeps the element valid for the next load.
+    const element = videoElement.value as any;
+    if (element) {
+      try {
+        element.pause();
+      } catch {}
+      try {
+        element.engine?.stopLoad?.();
+      } catch {}
     }
   }
 

@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { VideoItem } from "@/bindings";
-import { usePlayer } from "@/composables/usePlayer";
 import { CheckCircle2, Play, ListMusic } from "@lucide/vue";
 
 const props = defineProps<{
@@ -8,10 +7,8 @@ const props = defineProps<{
 }>();
 
 const router = useRouter();
-const { closePlayer } = usePlayer();
 
 function openVideo() {
-  closePlayer();
   if (props.video.playlistId) {
     router.push({
       path: `/watch/${props.video.id}`,

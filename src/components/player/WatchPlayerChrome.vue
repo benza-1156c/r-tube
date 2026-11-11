@@ -1,50 +1,47 @@
 <script setup lang="ts">
 import { usePlayer } from "@/composables/usePlayer";
-import { Minimize2 } from "@lucide/vue";
-import { Switch } from "@/lib/components/ui/switch";
+import { ListVideo, Minimize2 } from "@lucide/vue";
 import PlayerQualityMenu from "./PlayerQualityMenu.vue";
 
 defineOptions({ name: "WatchPlayerChrome" });
 
 const player = usePlayer();
-
-function handleAutoplayChange(val: boolean): void {
-  player.isAutoplayEnabled.value = val;
-  if (!val) {
-    player.cancelAutoplay();
-  }
-}
 </script>
 
 <template>
   <!--
-    Watch-mode chrome only. It stays out of the way of the skin's own controls
-    (it has no full-size hit area) and stops clicks from reaching the player's
+    Watch-mode chrome only, as a compact row of round buttons. It has no
+    full-size hit area and stops clicks from reaching the player's
     click-to-pause gesture.
   -->
-  <div class="absolute top-2.5 right-3 z-40 flex items-center gap-2">
-    <!-- Autoplay toggle switch (YouTube style) -->
-    <div
-      class="flex items-center gap-1.5 rounded-full bg-black/60 px-1.5 py-1 text-white shadow-md ring-1 ring-white/20 backdrop-blur-sm"
-      title="Autoplay"
-      @click.stop
+  <div class="absolute top-2.5 right-3 z-40 flex items-center gap-1.5">
+    <!-- Autoplay next: compact icon toggle instead of a long pill -->
+    <button
+      type="button"
+      class="rt-chrome-btn"
+      :class="{ 'rt-chrome-btn--off': !player.isAutoplayEnabled.value }"
+      :aria-pressed="player.isAutoplayEnabled.value"
+      :title="
+        player.isAutoplayEnabled.value ? 'Autoplay: on' : 'Autoplay: off'
+      "
+      :aria-label="
+        player.isAutoplayEnabled.value
+          ? 'Turn autoplay off'
+          : 'Turn autoplay on'
+      "
+      @click.stop="player.toggleAutoplay()"
     >
-      <Switch
-        :model-value="player.isAutoplayEnabled.value"
-        class="h-4 w-7 data-[state=checked]:bg-primary cursor-pointer"
-        aria-label="Toggle autoplay"
-        @update:model-value="handleAutoplayChange"
-      />
-    </div>
+      <ListVideo class="h-4 w-4" />
+    </button>
 
     <button
       type="button"
-      class="rounded bg-black/60 p-1.5 text-white shadow-md ring-1 ring-white/20 backdrop-blur-sm transition-colors hover:bg-black/80 cursor-pointer"
+      class="rt-chrome-btn"
       title="Minimize to mini player"
       aria-label="Minimize to mini player"
       @click.stop="player.minimizeToMiniPlayer"
     >
-      <Minimize2 class="h-3.5 w-3.5" />
+      <Minimize2 class="h-4 w-4" />
     </button>
 
     <PlayerQualityMenu />
