@@ -2514,7 +2514,7 @@ dependencies = [
 [[package]]
 name = "innertube-rs"
 version = "0.10.1"
-source = "git+https://github.com/benza-1156c/innertube-rs?branch=main#8d2160a993782fc5a99848a99e9314d89ee058b3"
+source = "git+https://github.com/benza-1156c/innertube-rs?branch=main#a54d62a1acdc4c62060065c4ea9dd16fba824017"
 dependencies = [
  "base64 0.23.1",
  "bytes",

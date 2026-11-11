@@ -4,382 +4,508 @@ import { invoke as __TAURI_INVOKE } from "@tauri-apps/api/core";
 
 /** Commands */
 export const commands = {
-	loginYt: () => typedError<Model, AppError_Serialize>(__TAURI_INVOKE("login_yt")),
-	logout: () => typedError<null, AppError_Serialize>(__TAURI_INVOKE("logout")),
-	greet: (name: string) => __TAURI_INVOKE<string>("greet", { name }),
-	getActiveProfile: () => typedError<Model | null, AppError_Serialize>(__TAURI_INVOKE("get_active_profile")),
-	getAllProfiles: () => typedError<Model[], AppError_Serialize>(__TAURI_INVOKE("get_all_profiles")),
-	upsertProfile: (name: string, email: string, avatarUrl: string, cookies: string) => typedError<Model, AppError_Serialize>(__TAURI_INVOKE("upsert_profile", { name, email, avatarUrl, cookies })),
-	setActiveProfile: (id: number) => typedError<Model, AppError_Serialize>(__TAURI_INVOKE("set_active_profile", { id })),
-	deleteProfile: (id: number) => typedError<boolean, AppError_Serialize>(__TAURI_INVOKE("delete_profile", { id })),
-	getSettings: () => typedError<AppSettings_Serialize, AppError_Serialize>(__TAURI_INVOKE("get_settings")),
-	getHomeFeed: (continuation: string | null, params: string | null) => typedError<HomeFeed_Serialize, AppError_Serialize>(__TAURI_INVOKE("get_home_feed", { continuation, params })),
-	getSubscriptionsFeed: () => typedError<BrowseFeed_Serialize, AppError_Serialize>(__TAURI_INVOKE("get_subscriptions_feed")),
-	getTrending: () => typedError<TrendingFeed_Serialize, AppError_Serialize>(__TAURI_INVOKE("get_trending")),
-	search: (query: string, continuation: string | null) => typedError<SearchResults_Serialize, AppError_Serialize>(__TAURI_INVOKE("search", { query, continuation })),
-	getSearchSuggestions: (query: string) => typedError<SearchSuggestionItem_Serialize[], AppError_Serialize>(__TAURI_INVOKE("get_search_suggestions", { query })),
-	getPlaylist: (playlistId: string) => typedError<PlaylistDetailView_Serialize, AppError_Serialize>(__TAURI_INVOKE("get_playlist", { playlistId })),
-	getPlaylistContinuation: (continuation: string) => typedError<PlaylistContinuationResult_Serialize, AppError_Serialize>(__TAURI_INVOKE("get_playlist_continuation", { continuation })),
-	getVideoInfo: (videoId: string) => typedError<PlayerResponse_Serialize, AppError_Serialize>(__TAURI_INVOKE("get_video_info", { videoId })),
-	getWatchNext: (videoId: string) => typedError<WatchNextResults_Serialize, AppError_Serialize>(__TAURI_INVOKE("get_watch_next", { videoId })),
-	getAccountInfo: () => typedError<CurrentUserProfile_Serialize, AppError_Serialize>(__TAURI_INVOKE("get_account_info")),
-	/**  Record the playback event that puts a video into the watch history. */
-	recordWatchStart: (videoId: string) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("record_watch_start", { videoId })),
-	/**  Report the playback position so the account remembers where it stopped. */
-	updateWatchTime: (videoId: string, seconds: number | null) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("update_watch_time", { videoId, seconds })),
-	/**  Watch history of the signed-in account. */
-	getHistory: () => typedError<VideoItem_Serialize[], AppError_Serialize>(__TAURI_INVOKE("get_history")),
-	getSubtitleContent: (url: string) => typedError<string, AppError_Serialize>(__TAURI_INVOKE("get_subtitle_content", { url })),
+  loginYt: () =>
+    typedError<Model, AppError_Serialize>(__TAURI_INVOKE("login_yt")),
+  logout: () => typedError<null, AppError_Serialize>(__TAURI_INVOKE("logout")),
+  greet: (name: string) => __TAURI_INVOKE<string>("greet", { name }),
+  getActiveProfile: () =>
+    typedError<Model | null, AppError_Serialize>(
+      __TAURI_INVOKE("get_active_profile"),
+    ),
+  getAllProfiles: () =>
+    typedError<Model[], AppError_Serialize>(__TAURI_INVOKE("get_all_profiles")),
+  upsertProfile: (
+    name: string,
+    email: string,
+    avatarUrl: string,
+    cookies: string,
+  ) =>
+    typedError<Model, AppError_Serialize>(
+      __TAURI_INVOKE("upsert_profile", { name, email, avatarUrl, cookies }),
+    ),
+  setActiveProfile: (id: number) =>
+    typedError<Model, AppError_Serialize>(
+      __TAURI_INVOKE("set_active_profile", { id }),
+    ),
+  deleteProfile: (id: number) =>
+    typedError<boolean, AppError_Serialize>(
+      __TAURI_INVOKE("delete_profile", { id }),
+    ),
+  getSettings: () =>
+    typedError<AppSettings_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("get_settings"),
+    ),
+  getHomeFeed: (continuation: string | null, params: string | null) =>
+    typedError<HomeFeed_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("get_home_feed", { continuation, params }),
+    ),
+  getSubscriptionsFeed: () =>
+    typedError<BrowseFeed_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("get_subscriptions_feed"),
+    ),
+  getTrending: () =>
+    typedError<TrendingFeed_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("get_trending"),
+    ),
+  search: (query: string, continuation: string | null) =>
+    typedError<SearchResults_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("search", { query, continuation }),
+    ),
+  getSearchSuggestions: (query: string) =>
+    typedError<SearchSuggestionItem_Serialize[], AppError_Serialize>(
+      __TAURI_INVOKE("get_search_suggestions", { query }),
+    ),
+  getPlaylist: (playlistId: string) =>
+    typedError<PlaylistDetailView_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("get_playlist", { playlistId }),
+    ),
+  getPlaylistContinuation: (continuation: string) =>
+    typedError<PlaylistContinuationResult_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("get_playlist_continuation", { continuation }),
+    ),
+  getVideoInfo: (videoId: string) =>
+    typedError<PlayerResponse_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("get_video_info", { videoId }),
+    ),
+  getWatchNext: (
+    videoId: string,
+    playlistId?: string | null,
+    playlistIndex?: number | null,
+  ) =>
+    typedError<WatchNextResults_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("get_watch_next", {
+        videoId,
+        playlistId: playlistId ?? null,
+        playlistIndex: playlistIndex ?? null,
+      }),
+    ),
+  getAccountInfo: () =>
+    typedError<CurrentUserProfile_Serialize, AppError_Serialize>(
+      __TAURI_INVOKE("get_account_info"),
+    ),
+  /**  Record the playback event that puts a video into the watch history. */
+  recordWatchStart: (videoId: string) =>
+    typedError<null, AppError_Serialize>(
+      __TAURI_INVOKE("record_watch_start", { videoId }),
+    ),
+  /**  Report the playback position so the account remembers where it stopped. */
+  updateWatchTime: (videoId: string, seconds: number | null) =>
+    typedError<null, AppError_Serialize>(
+      __TAURI_INVOKE("update_watch_time", { videoId, seconds }),
+    ),
+  /**  Watch history of the signed-in account. */
+  getHistory: () =>
+    typedError<VideoItem_Serialize[], AppError_Serialize>(
+      __TAURI_INVOKE("get_history"),
+    ),
+  getSubtitleContent: (url: string) =>
+    typedError<string, AppError_Serialize>(
+      __TAURI_INVOKE("get_subtitle_content", { url }),
+    ),
 };
 
 /* Types */
 export type AppError = AppError_Serialize | AppError_Deserialize;
 
-export type AppError_Deserialize = { type: "Database"; message: string } | { type: "NotFound"; message: string } | { type: "Validation"; message: string } | { type: "Internal"; message: string };
+export type AppError_Deserialize =
+  | { type: "Database"; message: string }
+  | { type: "NotFound"; message: string }
+  | { type: "Validation"; message: string }
+  | { type: "Internal"; message: string };
 
-export type AppError_Serialize = { type: "Database"; message: string } | { type: "NotFound"; message: string } | { type: "Validation"; message: string } | { type: "Internal"; message: string };
+export type AppError_Serialize =
+  | { type: "Database"; message: string }
+  | { type: "NotFound"; message: string }
+  | { type: "Validation"; message: string }
+  | { type: "Internal"; message: string };
 
 export type AppSettings = AppSettings_Serialize | AppSettings_Deserialize;
 
 export type AppSettings_Deserialize = {
-	volume: number | null,
-	defaultResolution: string,
-	playbackMode: PlaybackMode,
-} & ({
-	audioLanguage: string,
-	language?: never,
-} | {
-	language: string,
-	audioLanguage?: never,
-});
+  volume: number | null;
+  defaultResolution: string;
+  playbackMode: PlaybackMode;
+} & (
+  | {
+      audioLanguage: string;
+      language?: never;
+    }
+  | {
+      language: string;
+      audioLanguage?: never;
+    }
+);
 
 export type AppSettings_Serialize = {
-	volume: number | null,
-	audioLanguage: string,
-	defaultResolution: string,
-	playbackMode: PlaybackMode,
+  volume: number | null;
+  audioLanguage: string;
+  defaultResolution: string;
+  playbackMode: PlaybackMode;
 };
 
 export type BrowseFeed = BrowseFeed_Serialize | BrowseFeed_Deserialize;
 
 export type BrowseFeed_Deserialize = {
-	browseId: string,
-	videos: VideoItem_Deserialize[],
-	playlists: PlaylistItem_Deserialize[],
-	continuationToken?: string | null,
+  browseId: string;
+  videos: VideoItem_Deserialize[];
+  playlists: PlaylistItem_Deserialize[];
+  continuationToken?: string | null;
 };
 
 export type BrowseFeed_Serialize = {
-	browseId: string,
-	videos: VideoItem_Serialize[],
-	playlists: PlaylistItem_Serialize[],
-	continuationToken: string | null,
+  browseId: string;
+  videos: VideoItem_Serialize[];
+  playlists: PlaylistItem_Serialize[];
+  continuationToken: string | null;
 };
 
 export type CaptionTrack = {
-	languageCode: string,
-	name: string,
-	vttUrl: string,
+  languageCode: string;
+  name: string;
+  vttUrl: string;
 };
 
-export type CurrentUserProfile = CurrentUserProfile_Serialize | CurrentUserProfile_Deserialize;
+export type CurrentUserProfile =
+  | CurrentUserProfile_Serialize
+  | CurrentUserProfile_Deserialize;
 
 export type CurrentUserProfile_Deserialize = {
-	name: string,
-	email: string,
-	avatar_url: string,
-	handle?: string | null,
+  name: string;
+  email: string;
+  avatar_url: string;
+  handle?: string | null;
 };
 
 export type CurrentUserProfile_Serialize = {
-	name: string,
-	email: string,
-	avatar_url: string,
-	handle: string | null,
+  name: string;
+  email: string;
+  avatar_url: string;
+  handle: string | null;
 };
 
 export type FilterChip = FilterChip_Serialize | FilterChip_Deserialize;
 
 export type FilterChip_Deserialize = {
-	text: string,
-	params?: string | null,
-	isSelected: boolean,
+  text: string;
+  params?: string | null;
+  isSelected: boolean;
 };
 
 export type FilterChip_Serialize = {
-	text: string,
-	params: string | null,
-	isSelected: boolean,
+  text: string;
+  params: string | null;
+  isSelected: boolean;
 };
 
 export type HomeFeed = HomeFeed_Serialize | HomeFeed_Deserialize;
 
 export type HomeFeed_Deserialize = {
-	filterChips: FilterChip_Deserialize[],
-	videos: VideoItem_Deserialize[],
-	playlists: PlaylistItem_Deserialize[],
-	continuationToken?: string | null,
+  filterChips: FilterChip_Deserialize[];
+  videos: VideoItem_Deserialize[];
+  playlists: PlaylistItem_Deserialize[];
+  continuationToken?: string | null;
 };
 
 export type HomeFeed_Serialize = {
-	filterChips: FilterChip_Serialize[],
-	videos: VideoItem_Serialize[],
-	playlists: PlaylistItem_Serialize[],
-	continuationToken: string | null,
+  filterChips: FilterChip_Serialize[];
+  videos: VideoItem_Serialize[];
+  playlists: PlaylistItem_Serialize[];
+  continuationToken: string | null;
 };
 
 export type Model = {
-	id: number,
-	google_id: string,
-	name: string,
-	email: string,
-	avatar_url: string,
-	cookies: string,
-	is_active: boolean,
-	updated_at: string,
+  id: number;
+  google_id: string;
+  name: string;
+  email: string;
+  avatar_url: string;
+  cookies: string;
+  is_active: boolean;
+  updated_at: string;
 };
 
 export type PlaybackMode = "normal" | "audio-only";
 
-export type PlayerResponse = PlayerResponse_Serialize | PlayerResponse_Deserialize;
+export type PlayerResponse =
+  | PlayerResponse_Serialize
+  | PlayerResponse_Deserialize;
 
 export type PlayerResponse_Deserialize = {
-	id: string,
-	title: string,
-	description: string,
-	channelName: string,
-	channelId: string,
-	lengthSeconds: string,
-	viewCount: string,
-	isLive: boolean,
-	thumbnailUrl: string,
-	/**
-	 *  Proxied HLS master playlist. The only playback source the player uses:
-	 *  HLS serves one URL per segment, which is what makes seeking work.
-	 */
-	hlsManifestUrl?: string | null,
-	captions: CaptionTrack[],
+  id: string;
+  title: string;
+  description: string;
+  channelName: string;
+  channelId: string;
+  lengthSeconds: string;
+  viewCount: string;
+  isLive: boolean;
+  thumbnailUrl: string;
+  /**
+   *  Proxied HLS master playlist. The only playback source the player uses:
+   *  HLS serves one URL per segment, which is what makes seeking work.
+   */
+  hlsManifestUrl?: string | null;
+  captions: CaptionTrack[];
 };
 
 export type PlayerResponse_Serialize = {
-	id: string,
-	title: string,
-	description: string,
-	channelName: string,
-	channelId: string,
-	lengthSeconds: string,
-	viewCount: string,
-	isLive: boolean,
-	thumbnailUrl: string,
-	/**
-	 *  Proxied HLS master playlist. The only playback source the player uses:
-	 *  HLS serves one URL per segment, which is what makes seeking work.
-	 */
-	hlsManifestUrl: string | null,
-	captions: CaptionTrack[],
+  id: string;
+  title: string;
+  description: string;
+  channelName: string;
+  channelId: string;
+  lengthSeconds: string;
+  viewCount: string;
+  isLive: boolean;
+  thumbnailUrl: string;
+  /**
+   *  Proxied HLS master playlist. The only playback source the player uses:
+   *  HLS serves one URL per segment, which is what makes seeking work.
+   */
+  hlsManifestUrl: string | null;
+  captions: CaptionTrack[];
 };
 
-export type PlaylistContinuationResult = PlaylistContinuationResult_Serialize | PlaylistContinuationResult_Deserialize;
+export type PlaylistContinuationResult =
+  | PlaylistContinuationResult_Serialize
+  | PlaylistContinuationResult_Deserialize;
 
 export type PlaylistContinuationResult_Deserialize = {
-	videos: PlaylistVideoItem_Deserialize[],
-	continuationToken?: string | null,
+  videos: PlaylistVideoItem_Deserialize[];
+  continuationToken?: string | null;
 };
 
 export type PlaylistContinuationResult_Serialize = {
-	videos: PlaylistVideoItem_Serialize[],
-	continuationToken: string | null,
+  videos: PlaylistVideoItem_Serialize[];
+  continuationToken: string | null;
 };
 
-export type PlaylistDetailView = PlaylistDetailView_Serialize | PlaylistDetailView_Deserialize;
+export type PlaylistDetailView =
+  | PlaylistDetailView_Serialize
+  | PlaylistDetailView_Deserialize;
 
 export type PlaylistDetailView_Deserialize = {
-	id: string,
-	title: string,
-	author?: string | null,
-	authorId?: string | null,
-	authorAvatarUrl?: string | null,
-	description?: string | null,
-	videoCount?: number | null,
-	viewCount?: string | null,
-	lastUpdated?: string | null,
-	thumbnail?: string | null,
-	videos: PlaylistVideoItem_Deserialize[],
-	continuationToken?: string | null,
-	isEditable: boolean,
+  id: string;
+  title: string;
+  author?: string | null;
+  authorId?: string | null;
+  authorAvatarUrl?: string | null;
+  description?: string | null;
+  videoCount?: number | null;
+  viewCount?: string | null;
+  lastUpdated?: string | null;
+  thumbnail?: string | null;
+  videos: PlaylistVideoItem_Deserialize[];
+  continuationToken?: string | null;
+  isEditable: boolean;
+  isMix: boolean;
 };
 
 export type PlaylistDetailView_Serialize = {
-	id: string,
-	title: string,
-	author: string | null,
-	authorId: string | null,
-	authorAvatarUrl: string | null,
-	description: string | null,
-	videoCount: number | null,
-	viewCount: string | null,
-	lastUpdated: string | null,
-	thumbnail: string | null,
-	videos: PlaylistVideoItem_Serialize[],
-	continuationToken: string | null,
-	isEditable: boolean,
+  id: string;
+  title: string;
+  author: string | null;
+  authorId: string | null;
+  authorAvatarUrl: string | null;
+  description: string | null;
+  videoCount: number | null;
+  viewCount: string | null;
+  lastUpdated: string | null;
+  thumbnail: string | null;
+  videos: PlaylistVideoItem_Serialize[];
+  continuationToken: string | null;
+  isEditable: boolean;
+  isMix: boolean;
 };
 
 export type PlaylistItem = PlaylistItem_Serialize | PlaylistItem_Deserialize;
 
 export type PlaylistItem_Deserialize = {
-	id: string,
-	title: string,
-	thumbnailUrl: string,
-	authorName: string,
-	authorAvatarUrl: string,
-	videoCount?: number | null,
-	firstVideoId?: string | null,
-	lastUpdated?: string | null,
-	viewCount?: string | null,
-	badgeText: string,
+  id: string;
+  title: string;
+  thumbnailUrl: string;
+  authorName: string;
+  authorAvatarUrl: string;
+  videoCount?: number | null;
+  firstVideoId?: string | null;
+  lastUpdated?: string | null;
+  viewCount?: string | null;
+  badgeText: string;
+  isMix: boolean;
 };
 
 export type PlaylistItem_Serialize = {
-	id: string,
-	title: string,
-	thumbnailUrl: string,
-	authorName: string,
-	authorAvatarUrl: string,
-	videoCount: number | null,
-	firstVideoId: string | null,
-	lastUpdated: string | null,
-	viewCount: string | null,
-	badgeText: string,
+  id: string;
+  title: string;
+  thumbnailUrl: string;
+  authorName: string;
+  authorAvatarUrl: string;
+  videoCount: number | null;
+  firstVideoId: string | null;
+  lastUpdated: string | null;
+  viewCount: string | null;
+  badgeText: string;
+  isMix: boolean;
 };
 
-export type PlaylistVideoItem = PlaylistVideoItem_Serialize | PlaylistVideoItem_Deserialize;
+export type PlaylistPanelItem =
+  | PlaylistPanelItem_Serialize
+  | PlaylistPanelItem_Deserialize;
+
+export type PlaylistPanelItem_Deserialize = {
+  videoId: string;
+  title: string;
+  author: string;
+  index?: number | null;
+  isSelected: boolean;
+  thumbnailUrl: string;
+};
+
+export type PlaylistPanelItem_Serialize = {
+  videoId: string;
+  title: string;
+  author: string;
+  index: number | null;
+  isSelected: boolean;
+  thumbnailUrl: string;
+};
+
+export type PlaylistVideoItem =
+  | PlaylistVideoItem_Serialize
+  | PlaylistVideoItem_Deserialize;
 
 export type PlaylistVideoItem_Deserialize = {
-	id: string,
-	title: string,
-	author: string,
-	authorId?: string | null,
-	duration?: string | null,
-	durationMs?: number | null,
-	thumbnail?: string | null,
-	index?: number | null,
-	isPlayable: boolean,
+  id: string;
+  title: string;
+  author: string;
+  authorId?: string | null;
+  duration?: string | null;
+  durationMs?: number | null;
+  thumbnail?: string | null;
+  index?: number | null;
+  isPlayable: boolean;
 };
 
 export type PlaylistVideoItem_Serialize = {
-	id: string,
-	title: string,
-	author: string,
-	authorId: string | null,
-	duration: string | null,
-	durationMs: number | null,
-	thumbnail: string | null,
-	index: number | null,
-	isPlayable: boolean,
+  id: string;
+  title: string;
+  author: string;
+  authorId: string | null;
+  duration: string | null;
+  durationMs: number | null;
+  thumbnail: string | null;
+  index: number | null;
+  isPlayable: boolean;
 };
 
 export type SearchResults = SearchResults_Serialize | SearchResults_Deserialize;
 
 export type SearchResults_Deserialize = {
-	query: string,
-	videos: VideoItem_Deserialize[],
-	playlists: PlaylistItem_Deserialize[],
-	continuationToken?: string | null,
+  query: string;
+  videos: VideoItem_Deserialize[];
+  playlists: PlaylistItem_Deserialize[];
+  continuationToken?: string | null;
 };
 
 export type SearchResults_Serialize = {
-	query: string,
-	videos: VideoItem_Serialize[],
-	playlists: PlaylistItem_Serialize[],
-	continuationToken: string | null,
+  query: string;
+  videos: VideoItem_Serialize[];
+  playlists: PlaylistItem_Serialize[];
+  continuationToken: string | null;
 };
 
-export type SearchSuggestionItem = SearchSuggestionItem_Serialize | SearchSuggestionItem_Deserialize;
+export type SearchSuggestionItem =
+  | SearchSuggestionItem_Serialize
+  | SearchSuggestionItem_Deserialize;
 
 export type SearchSuggestionItem_Deserialize = {
-	text: string,
-	subtitle?: string | null,
-	thumbnail?: string | null,
-	isHistory: boolean,
-	channelId?: string | null,
+  text: string;
+  subtitle?: string | null;
+  thumbnail?: string | null;
+  isHistory: boolean;
+  channelId?: string | null;
 };
 
 export type SearchSuggestionItem_Serialize = {
-	text: string,
-	subtitle: string | null,
-	thumbnail: string | null,
-	isHistory: boolean,
-	channelId: string | null,
+  text: string;
+  subtitle: string | null;
+  thumbnail: string | null;
+  isHistory: boolean;
+  channelId: string | null;
 };
 
 export type TrendingFeed = TrendingFeed_Serialize | TrendingFeed_Deserialize;
 
 export type TrendingFeed_Deserialize = {
-	currentTab: string,
-	videos: VideoItem_Deserialize[],
+  currentTab: string;
+  videos: VideoItem_Deserialize[];
 };
 
 export type TrendingFeed_Serialize = {
-	currentTab: string,
-	videos: VideoItem_Serialize[],
+  currentTab: string;
+  videos: VideoItem_Serialize[];
 };
 
 export type VideoItem = VideoItem_Serialize | VideoItem_Deserialize;
 
 export type VideoItem_Deserialize = {
-	id: string,
-	title: string,
-	thumbnailUrl: string,
-	duration: string,
-	channelName: string,
-	channelAvatarUrl: string,
-	isVerified: boolean,
-	isLive: boolean,
-	viewCount: string,
-	publishedAt: string,
-	playlistId?: string | null,
+  id: string;
+  title: string;
+  thumbnailUrl: string;
+  duration: string;
+  channelName: string;
+  channelAvatarUrl: string;
+  isVerified: boolean;
+  isLive: boolean;
+  viewCount: string;
+  publishedAt: string;
+  playlistId?: string | null;
 };
 
 export type VideoItem_Serialize = {
-	id: string,
-	title: string,
-	thumbnailUrl: string,
-	duration: string,
-	channelName: string,
-	channelAvatarUrl: string,
-	isVerified: boolean,
-	isLive: boolean,
-	viewCount: string,
-	publishedAt: string,
-	playlistId: string | null,
+  id: string;
+  title: string;
+  thumbnailUrl: string;
+  duration: string;
+  channelName: string;
+  channelAvatarUrl: string;
+  isVerified: boolean;
+  isLive: boolean;
+  viewCount: string;
+  publishedAt: string;
+  playlistId: string | null;
 };
 
-export type WatchNextResults = WatchNextResults_Serialize | WatchNextResults_Deserialize;
+export type WatchNextResults =
+  | WatchNextResults_Serialize
+  | WatchNextResults_Deserialize;
 
 export type WatchNextResults_Deserialize = {
-	currentVideoId: string,
-	currentTitle?: string | null,
-	currentAuthor?: string | null,
-	relatedVideos: VideoItem_Deserialize[],
-	continuationToken?: string | null,
+  currentVideoId: string;
+  currentTitle?: string | null;
+  currentAuthor?: string | null;
+  relatedVideos: VideoItem_Deserialize[];
+  playlistItems: PlaylistPanelItem_Deserialize[];
+  continuationToken?: string | null;
 };
 
 export type WatchNextResults_Serialize = {
-	currentVideoId: string,
-	currentTitle: string | null,
-	currentAuthor: string | null,
-	relatedVideos: VideoItem_Serialize[],
-	continuationToken: string | null,
+  currentVideoId: string;
+  currentTitle: string | null;
+  currentAuthor: string | null;
+  relatedVideos: VideoItem_Serialize[];
+  playlistItems: PlaylistPanelItem_Serialize[];
+  continuationToken: string | null;
 };
 
 /* Tauri Specta runtime */
-async function typedError<T, E>(result: Promise<T>): Promise<{ status: "ok"; data: T } | { status: "error"; error: E }> {
-    try {
-        return { status: "ok", data: await result };
-    } catch (e) {
-        if (e instanceof Error) throw e;
-        return { status: "error", error: e as any };
-    }
+async function typedError<T, E>(
+  result: Promise<T>,
+): Promise<{ status: "ok"; data: T } | { status: "error"; error: E }> {
+  try {
+    return { status: "ok", data: await result };
+  } catch (e) {
+    if (e instanceof Error) throw e;
+    return { status: "error", error: e as any };
+  }
 }
-

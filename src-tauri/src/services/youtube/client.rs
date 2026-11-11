@@ -1,6 +1,5 @@
 use innertube_rs::{
     BrowseFeed, HomeFeed, Innertube, SearchResults, SessionOptions, TrendingFeed, VideoInfo,
-    WatchNextResults,
 };
 use reqwest::header::HeaderMap;
 use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter};
@@ -14,7 +13,7 @@ use crate::db::entities::profile;
 use crate::error::AppError;
 use crate::models::youtube::{
     CaptionTrack, PlayerResponse, PlaylistContinuationResult, PlaylistDetailView,
-    SearchSuggestionItem, VideoItem,
+    SearchSuggestionItem, VideoItem, WatchNextResults,
 };
 use crate::services::youtube::cookie::CookieManager;
 
@@ -197,14 +196,21 @@ impl YoutubeClient {
     }
 
     /// Get rich search autocomplete suggestions with subtitles and thumbnails from innertube-rs
-    pub async fn get_search_suggestions(&self, query: &str) -> Result<Vec<SearchSuggestionItem>, AppError> {
+    pub async fn get_search_suggestions(
+        &self,
+        query: &str,
+    ) -> Result<Vec<SearchSuggestionItem>, AppError> {
         let yt = self.innertube.read().await;
         let res = yt
             .get_search_suggestions(query, false)
             .await
             .map_err(|e| AppError::Internal(format!("Failed to fetch search suggestions: {e}")))?;
 
-        Ok(res.items.into_iter().map(SearchSuggestionItem::from).collect())
+        Ok(res
+            .items
+            .into_iter()
+            .map(SearchSuggestionItem::from)
+            .collect())
     }
 
     /// HLS is the only playback path: every segment arrives as its own URL,
@@ -274,11 +280,23 @@ impl YoutubeClient {
         None
     }
     /// Get watch next details (related videos and playlist context)
-    pub async fn get_watch_next(&self, video_id: &str) -> Result<WatchNextResults, AppError> {
+    pub async fn get_watch_next(
+        &self,
+        video_id: &str,
+        playlist_id: Option<&str>,
+        playlist_index: Option<usize>,
+    ) -> Result<WatchNextResults, AppError> {
         let yt = self.innertube.read().await;
-        yt.get_watch_next(video_id)
-            .await
-            .map_err(|e| AppError::Internal(format!("Failed to get watch next details: {e}")))
+        let res = if let Some(pl_id) = playlist_id {
+            yt.get_playlist_watch_next(video_id, pl_id, playlist_index)
+                .await
+                .map_err(|e| AppError::Internal(format!("Failed to get watch next details: {e}")))?
+        } else {
+            yt.get_watch_next(video_id)
+                .await
+                .map_err(|e| AppError::Internal(format!("Failed to get watch next details: {e}")))?
+        };
+        Ok(WatchNextResults::from(res))
     }
 
     /// Player session data for a video: the cached one when it matches, a

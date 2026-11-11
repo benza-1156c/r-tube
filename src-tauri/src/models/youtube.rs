@@ -31,6 +31,7 @@ pub struct PlaylistItem {
     pub last_updated: Option<String>,
     pub view_count: Option<String>,
     pub badge_text: String,
+    pub is_mix: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
@@ -113,11 +114,23 @@ pub struct PlayerResponse {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
+pub struct PlaylistPanelItem {
+    pub video_id: String,
+    pub title: String,
+    pub author: String,
+    pub index: Option<u32>,
+    pub is_selected: bool,
+    pub thumbnail_url: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
 pub struct WatchNextResults {
     pub current_video_id: String,
     pub current_title: Option<String>,
     pub current_author: Option<String>,
     pub related_videos: Vec<VideoItem>,
+    pub playlist_items: Vec<PlaylistPanelItem>,
     pub continuation_token: Option<String>,
 }
 
@@ -145,6 +158,7 @@ pub struct PlaylistDetailView {
     pub videos: Vec<PlaylistVideoItem>,
     pub continuation_token: Option<String>,
     pub is_editable: bool,
+    pub is_mix: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
@@ -241,10 +255,12 @@ impl From<&innertube_rs::PlaylistNode> for PlaylistItem {
             .map(|w| w.video_id.clone())
             .filter(|id| !id.is_empty());
 
-        let badge_text = if let Some(count) = p.video_count {
+        let badge_text = if p.is_mix {
+            "Mix".to_string()
+        } else if let Some(count) = p.video_count {
             format!("{count} videos")
         } else {
-            "Mix".to_string()
+            "Playlist".to_string()
         };
 
         Self {
@@ -258,6 +274,7 @@ impl From<&innertube_rs::PlaylistNode> for PlaylistItem {
             last_updated: p.last_updated.clone(),
             view_count: p.view_count.clone(),
             badge_text,
+            is_mix: p.is_mix,
         }
     }
 }
@@ -346,10 +363,13 @@ impl From<innertube_rs::SearchResults> for SearchResults {
                             .ok()
                     });
 
-                    let badge_text = p
-                        .video_count
-                        .clone()
-                        .unwrap_or_else(|| "Playlist".to_string());
+                    let badge_text = if p.is_mix {
+                        "Mix".to_string()
+                    } else {
+                        p.video_count
+                            .clone()
+                            .unwrap_or_else(|| "Playlist".to_string())
+                    };
 
                     playlists.push(PlaylistItem {
                         id: p.playlist_id.clone(),
@@ -362,6 +382,7 @@ impl From<innertube_rs::SearchResults> for SearchResults {
                         last_updated: None,
                         view_count: None,
                         badge_text,
+                        is_mix: p.is_mix,
                     });
                 }
                 _ => {}
@@ -472,11 +493,33 @@ impl From<innertube_rs::WatchNextResults> for WatchNextResults {
             })
             .collect();
 
+        let playlist_items = res
+            .playlist_items
+            .into_iter()
+            .map(|p| {
+                let thumb = p
+                    .thumbnails
+                    .last()
+                    .or_else(|| p.thumbnails.first())
+                    .map(|t| t.url.clone())
+                    .unwrap_or_default();
+                PlaylistPanelItem {
+                    video_id: p.video_id,
+                    title: p.title,
+                    author: p.author,
+                    index: p.index.map(|i| i as u32),
+                    is_selected: p.is_selected,
+                    thumbnail_url: thumb,
+                }
+            })
+            .collect();
+
         Self {
             current_video_id: res.current_video_id,
             current_title: res.current_title,
             current_author: res.current_author,
             related_videos,
+            playlist_items,
             continuation_token: res.continuation_token,
         }
     }
@@ -538,6 +581,7 @@ impl From<innertube_rs::PlaylistView> for PlaylistDetailView {
             videos: pv.videos.iter().map(PlaylistVideoItem::from).collect(),
             continuation_token: pv.continuation_token,
             is_editable: pv.is_editable,
+            is_mix: pv.is_mix,
         }
     }
 }

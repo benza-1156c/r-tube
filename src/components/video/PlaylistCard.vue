@@ -10,20 +10,26 @@ const props = defineProps<{
 const router = useRouter();
 
 function openPlaylist() {
+  const videoId =
+    props.playlist.firstVideoId ||
+    props.playlist.id.replace(/^VL/, "").replace(/^RD/, "");
   router.push({
-    path: "/playlist",
-    query: { list: props.playlist.id },
+    path: `/watch/${videoId}`,
+    query: {
+      list: props.playlist.id,
+    },
   });
 }
 
 function playAll(e: MouseEvent) {
   e.stopPropagation();
-  const videoId = props.playlist.firstVideoId || props.playlist.id;
+  const videoId =
+    props.playlist.firstVideoId ||
+    props.playlist.id.replace(/^VL/, "").replace(/^RD/, "");
   router.push({
     path: `/watch/${videoId}`,
     query: {
       list: props.playlist.id,
-      index: "1",
     },
   });
 }

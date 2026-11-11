@@ -7,6 +7,7 @@ import {
   type VideoItem_Deserialize,
   type WatchNextResults_Deserialize,
 } from "@/bindings";
+import WatchPlaylistQueue from "@/components/playlist/WatchPlaylistQueue.vue";
 import {
   ThumbsUp,
   Share2,
@@ -27,6 +28,20 @@ const player = usePlayer();
 const videoId = computed(
   () => ((route.params as Record<string, any>)?.id as string) || "",
 );
+
+const playlistId = computed(() => {
+  const q = route.query.list;
+  return typeof q === "string" ? q.trim() : null;
+});
+
+const playlistIndex = computed(() => {
+  const idx = route.query.index;
+  if (typeof idx === "string") {
+    const num = parseInt(idx, 10);
+    return isNaN(num) ? null : num;
+  }
+  return null;
+});
 
 const watchNext = ref<WatchNextResults_Deserialize | null>(null);
 const isLoadingRelated = ref(false);
@@ -49,10 +64,39 @@ async function loadWatchData(id: string) {
   // Fetch Watch Next results (related videos & playlist context)
   isLoadingRelated.value = true;
   try {
-    const res = await commands.getWatchNext(id);
+    const res = await commands.getWatchNext(
+      id,
+      playlistId.value,
+      playlistIndex.value,
+    );
     if (res.status === "ok") {
       watchNext.value = res.data;
-      if (res.data.relatedVideos && res.data.relatedVideos.length > 0) {
+
+      // If playing within a playlist / mix, queue up the next song
+      if (res.data.playlistItems && res.data.playlistItems.length > 0) {
+        const curIdx = res.data.playlistItems.findIndex(
+          (p) => p.videoId === id || p.isSelected,
+        );
+        const nextItem =
+          curIdx >= 0 && curIdx + 1 < res.data.playlistItems.length
+            ? res.data.playlistItems[curIdx + 1]
+            : null;
+        if (nextItem) {
+          player.setUpNextVideo({
+            id: nextItem.videoId,
+            title: nextItem.title,
+            thumbnailUrl: nextItem.thumbnailUrl,
+            duration: "",
+            channelName: nextItem.author,
+            channelAvatarUrl: "",
+            isVerified: false,
+            isLive: false,
+            viewCount: "",
+            publishedAt: "",
+            playlistId: playlistId.value || undefined,
+          });
+        }
+      } else if (res.data.relatedVideos && res.data.relatedVideos.length > 0) {
         player.setUpNextVideo(res.data.relatedVideos[0]);
       }
     }
@@ -80,11 +124,11 @@ onUnmounted(() => {
   player.setWatchAnchor(null);
 });
 
-// React to route ID changes (e.g. clicking related video)
+// React to route ID or playlist changes
 watch(
-  () => videoId.value,
-  (newId) => {
-    if (newId && newId !== player.currentVideo.value?.id) {
+  [() => videoId.value, () => route.query.list, () => route.query.index],
+  ([newId]) => {
+    if (newId) {
       loadWatchData(newId);
     }
   },
@@ -245,8 +289,21 @@ function selectRelatedVideo(item: VideoItem_Deserialize) {
       </div>
     </div>
 
-    <!-- Right Column: Up Next / Related Videos -->
+    <!-- Right Column: Up Next / Related Videos & Playlist Queue -->
     <div class="w-full lg:w-96 flex flex-col gap-3 shrink-0">
+      <!-- Playlist Queue Panel (if playing inside a Mix / Playlist) -->
+      <WatchPlaylistQueue
+        v-if="
+          watchNext?.playlistItems &&
+          watchNext.playlistItems.length > 0 &&
+          playlistId
+        "
+        :playlist-id="playlistId"
+        :items="watchNext.playlistItems"
+        :current-video-id="videoId"
+        :current-title="watchNext.currentTitle"
+      />
+
       <div class="flex items-center justify-between">
         <h2 class="font-semibold text-sm text-foreground">Up next</h2>
         <Loader2

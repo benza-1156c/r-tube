@@ -82,9 +82,17 @@ pub async fn get_video_info(
 pub async fn get_watch_next(
     state: State<'_, AppState>,
     video_id: String,
+    playlist_id: Option<String>,
+    playlist_index: Option<u32>,
 ) -> Result<WatchNextResults, AppError> {
-    let next = state.yt.get_watch_next(&video_id).await?;
-    Ok(next.into())
+    state
+        .yt
+        .get_watch_next(
+            &video_id,
+            playlist_id.as_deref(),
+            playlist_index.map(|i| i as usize),
+        )
+        .await
 }
 
 #[app_command]
