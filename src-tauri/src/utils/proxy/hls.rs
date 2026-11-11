@@ -6,8 +6,7 @@ use tokio::net::TcpStream;
 
 use super::connection::write_text;
 use super::{
-    ACCEPT_LANGUAGE, CHROME_USER_AGENT, MANIFEST_REFRESHER, YT_ORIGIN, YT_REFERER, log_line,
-    wrap_hls_url,
+    ACCEPT_LANGUAGE, CHROME_USER_AGENT, MANIFEST_REFRESHER, YT_ORIGIN, YT_REFERER, wrap_hls_url,
 };
 
 /// Serve one HLS playlist (rewritten) or stream a media segment through.
@@ -45,7 +44,6 @@ async fn serve_refreshed(
     let Some(refresher) = MANIFEST_REFRESHER.get() else {
         return write_text(stream, 502, "upstream rejected the request").await;
     };
-    log_line(&format!("HLS refreshing master for {video_id}"));
 
     let Some(raw) = refresher(video_id.to_string()).await else {
         return write_text(stream, 502, "no fresh playlist").await;
@@ -53,10 +51,7 @@ async fn serve_refreshed(
 
     match fetch(client, &raw).await {
         Ok(response) => serve_response(stream, response, &raw, video_id, is_playlist, method).await,
-        Err(e) => {
-            log_line(&format!("HLS refresh failed: {e}"));
-            write_text(stream, 502, "upstream rejected the request").await
-        }
+        Err(_) => write_text(stream, 502, "upstream rejected the request").await,
     }
 }
 
@@ -70,7 +65,6 @@ async fn serve_response(
 ) -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
     let status = response.status();
     if !status.is_success() {
-        log_line(&format!("HLS upstream {}", status.as_u16()));
         return write_text(stream, 502, "upstream rejected the request").await;
     }
 
@@ -96,8 +90,7 @@ async fn serve_playlist(
 ) -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
     let text = match response.text().await {
         Ok(text) => text,
-        Err(e) => {
-            log_line(&format!("HLS playlist read failed: {e}"));
+        Err(_) => {
             return write_text(stream, 502, "could not read playlist").await;
         }
     };
@@ -160,8 +153,7 @@ async fn serve_segment(
                     return Ok(false);
                 }
             }
-            Err(e) => {
-                log_line(&format!("HLS segment error: {e}"));
+            Err(_) => {
                 return Ok(false);
             }
         }

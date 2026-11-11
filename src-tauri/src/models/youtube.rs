@@ -35,6 +35,15 @@ pub struct PlaylistItem {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
+pub struct SearchSuggestionItem {
+    pub text: String,
+    pub subtitle: Option<String>,
+    pub thumbnail: Option<String>,
+    pub is_history: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
 pub struct FilterChip {
     pub text: String,
     pub params: Option<String>,

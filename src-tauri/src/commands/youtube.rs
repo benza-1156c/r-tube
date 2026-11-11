@@ -3,7 +3,7 @@ use tauri::State;
 
 use crate::error::AppError;
 use crate::models::youtube::{
-    BrowseFeed, HomeFeed, PlayerResponse, SearchResults, TrendingFeed, VideoItem, WatchNextResults,
+    BrowseFeed, HomeFeed, PlayerResponse, SearchResults, SearchSuggestionItem, TrendingFeed, VideoItem, WatchNextResults,
 };
 use crate::services::youtube::CurrentUserProfile;
 use crate::state::AppState;
@@ -45,11 +45,20 @@ pub async fn search(
 }
 
 #[app_command]
+pub async fn get_search_suggestions(
+    state: State<'_, AppState>,
+    query: String,
+) -> Result<Vec<SearchSuggestionItem>, AppError> {
+    state.yt.get_search_suggestions(&query).await
+}
+
+#[app_command]
 pub async fn get_video_info(
     state: State<'_, AppState>,
     video_id: String,
 ) -> Result<PlayerResponse, AppError> {
-    state.yt.get_video_info(&video_id).await
+    let res = state.yt.get_video_info(&video_id).await;
+    res
 }
 
 #[app_command]

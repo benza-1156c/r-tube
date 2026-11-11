@@ -1,4 +1,4 @@
-﻿use innertube_rs::{
+use innertube_rs::{
     BrowseFeed, HomeFeed, Innertube, SearchResults, SessionOptions, TrendingFeed, VideoInfo,
     WatchNextResults,
 };
@@ -12,7 +12,7 @@ use tokio::sync::RwLock;
 
 use crate::db::entities::profile;
 use crate::error::AppError;
-use crate::models::youtube::{CaptionTrack, PlayerResponse, VideoItem};
+use crate::models::youtube::{CaptionTrack, PlayerResponse, SearchSuggestionItem, VideoItem};
 use crate::services::youtube::cookie::CookieManager;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
@@ -170,6 +170,115 @@ impl YoutubeClient {
         yt.search(query, continuation_token)
             .await
             .map_err(|e| AppError::Internal(format!("YouTube search failed: {e}")))
+    }
+
+    /// Get rich search autocomplete suggestions with subtitles and thumbnails
+    pub async fn get_search_suggestions(&self, query: &str) -> Result<Vec<SearchSuggestionItem>, AppError> {
+        let yt = self.innertube.read().await;
+        let client = &yt.session.http_client;
+        let base_url = "https://suggestqueries-clients6.youtube.com/complete/search";
+
+        let mut headers = HeaderMap::new();
+        headers.insert("Referer", "https://www.youtube.com/".parse().unwrap());
+        if let Some(ref cookie) = yt.session.cookie {
+            if let Ok(c_val) = cookie.parse() {
+                headers.insert("Cookie", c_val);
+            }
+        }
+
+        let query_params = vec![
+            ("client", "youtube".to_string()),
+            ("gs_ri", "youtube".to_string()),
+            ("gs_id", "0".to_string()),
+            ("cp", "0".to_string()),
+            ("ds", "yt".to_string()),
+            ("sugexp", "yt-control-0".to_string()),
+            ("hl", yt.session.context.client.hl.clone()),
+            ("gl", yt.session.context.client.gl.clone()),
+            ("q", query.to_string()),
+        ];
+
+        let resp = client
+            .get(base_url)
+            .headers(headers)
+            .query(&query_params)
+            .send()
+            .await
+            .map_err(|e| AppError::Internal(format!("Failed to fetch search suggestions: {e}")))?;
+
+        let raw_text = resp
+            .text()
+            .await
+            .map_err(|e| AppError::Internal(format!("Failed to read suggestions response: {e}")))?;
+
+        let json_str = if let Some(start) = raw_text.find('(') {
+            if let Some(end) = raw_text.rfind(')') {
+                &raw_text[start + 1..end]
+            } else {
+                &raw_text
+            }
+        } else {
+            &raw_text
+        };
+
+        let mut results = Vec::new();
+        if let Ok(val) = serde_json::from_str::<Value>(json_str) {
+            if let Some(arr) = val.as_array() {
+                if arr.len() >= 2 {
+                    if let Some(sug_list) = arr[1].as_array() {
+                        for sug in sug_list {
+                            if let Some(inner_arr) = sug.as_array() {
+                                if let Some(text) = inner_arr.first().and_then(|t| t.as_str()) {
+                                    let mut subtitle = None;
+                                    let mut thumbnail = None;
+                                    let mut is_history = false;
+
+                                    if let Some(flags) = inner_arr.get(2).and_then(|f| f.as_array()) {
+                                        for flag in flags {
+                                            if let Some(num) = flag.as_i64() {
+                                                if num == 39 {
+                                                    is_history = true;
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    if let Some(meta) = inner_arr.get(3).and_then(|m| m.as_object()) {
+                                        if let Some(sub) = meta.get("zaf").and_then(|s| s.as_str()) {
+                                            subtitle = Some(sub.to_string());
+                                        }
+                                        if let Some(thumb) = meta.get("zai").and_then(|t| t.as_str()) {
+                                            let fixed_thumb = if thumb.starts_with("//") {
+                                                format!("https:{thumb}")
+                                            } else {
+                                                thumb.to_string()
+                                            };
+                                            thumbnail = Some(fixed_thumb);
+                                        }
+                                    }
+
+                                    results.push(SearchSuggestionItem {
+                                        text: text.to_string(),
+                                        subtitle,
+                                        thumbnail,
+                                        is_history,
+                                    });
+                                }
+                            } else if let Some(text) = sug.as_str() {
+                                results.push(SearchSuggestionItem {
+                                    text: text.to_string(),
+                                    subtitle: None,
+                                    thumbnail: None,
+                                    is_history: false,
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(results)
     }
 
     /// HLS is the only playback path: every segment arrives as its own URL,

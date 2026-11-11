@@ -40,6 +40,7 @@ declare module 'vue' {
     DropdownMenuSubTrigger: typeof import('./../lib/components/ui/dropdown-menu/DropdownMenuSubTrigger.vue')['default']
     DropdownMenuTrigger: typeof import('./../lib/components/ui/dropdown-menu/DropdownMenuTrigger.vue')['default']
     GlobalVideoPlayer: typeof import('./../components/player/GlobalVideoPlayer.vue')['default']
+    HeaderSearch: typeof import('./../components/layout/HeaderSearch.vue')['default']
     Input: typeof import('./../lib/components/ui/input/Input.vue')['default']
     MiniPlayerBar: typeof import('./../components/player/MiniPlayerBar.vue')['default']
     PlayerQualityMenu: typeof import('./../components/player/PlayerQualityMenu.vue')['default']

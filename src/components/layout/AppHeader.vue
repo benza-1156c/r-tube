@@ -1,7 +1,10 @@
 <script setup lang="ts">
-import { Menu, Moon, Sun, User, LogOut, X, Loader2 } from "@lucide/vue";
+import { ref, onMounted } from "vue";
+import { useRouter } from "vue-router";
+import { Menu, Moon, Sun, User, LogOut, Loader2 } from "@lucide/vue";
 import { commands, type Model } from "@/bindings";
 import { useSidebar } from "@/lib/components/ui/sidebar";
+import HeaderSearch from "@/components/layout/HeaderSearch.vue";
 
 defineProps<{
   hideSidebar?: boolean;
@@ -10,7 +13,6 @@ defineProps<{
 const router = useRouter();
 const { toggleSidebar } = useSidebar();
 
-const searchQuery = ref("");
 const isDark = ref(true);
 const activeProfile = ref<Model | null>(null);
 const isLoggingIn = ref(false);
@@ -40,20 +42,11 @@ function toggleTheme() {
 async function handleLogin() {
   router.push("/login");
 }
-
-function handleSearch() {
-  if (!searchQuery.value.trim()) return;
-  console.log("Searching for:", searchQuery.value);
-}
-
-function clearSearch() {
-  searchQuery.value = "";
-}
 </script>
 
 <template>
   <header
-    class="sticky top-0 z-40 flex h-14 w-full items-center justify-between border-b border-sidebar-border bg-background/95 px-4 backdrop-blur-md"
+    class="sticky top-0 z-40 flex h-14 w-full items-center justify-between border-b border-border/20 bg-background/95 px-4 backdrop-blur-md"
   >
     <!-- Left Section: Toggle & Logo -->
     <div class="flex items-center gap-3">
@@ -80,26 +73,8 @@ function clearSearch() {
       </button>
     </div>
 
-    <!-- Center Section: Search Bar -->
-    <div class="flex flex-1 max-w-xl mx-4 items-center">
-      <div class="relative w-full flex items-center">
-        <Input
-          v-model="searchQuery"
-          type="text"
-          placeholder="Search"
-          class="h-9 w-full rounded-md border-border bg-muted/40 pl-4 pr-9 text-sm focus-visible:ring-1 focus-visible:ring-primary"
-          @keydown.enter="handleSearch"
-        />
-        <button
-          v-if="searchQuery"
-          type="button"
-          class="absolute right-2 text-muted-foreground hover:text-foreground cursor-pointer"
-          @click="clearSearch"
-        >
-          <X class="h-4 w-4" />
-        </button>
-      </div>
-    </div>
+    <!-- Center Section: Search Bar with Suggestions -->
+    <HeaderSearch />
 
     <!-- Right Section: Actions & Profile -->
     <div class="flex items-center gap-2">

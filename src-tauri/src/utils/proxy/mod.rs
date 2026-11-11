@@ -119,29 +119,3 @@ pub fn wrap_hls_url(raw_url: &str, video_id: &str) -> String {
     let vid: String = url::form_urlencoded::byte_serialize(video_id.as_bytes()).collect();
     format!("http://127.0.0.1:{port}/hls?url={encoded}&vid={vid}")
 }
-
-/// Append a diagnostic line to `%TEMP%/rtube-proxy.log` and to stdout.
-pub(crate) fn log_line(message: &str) {
-    println!("[Stream Proxy] {message}");
-
-    let path = std::env::temp_dir().join("rtube-proxy.log");
-    if std::fs::metadata(&path)
-        .map(|m| m.len() > 2 * 1024 * 1024)
-        .unwrap_or(false)
-    {
-        let _ = std::fs::remove_file(&path);
-    }
-    if let Ok(mut file) = std::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&path)
-    {
-        use std::io::Write;
-        let _ = writeln!(
-            file,
-            "{} {}",
-            chrono::Local::now().format("%H:%M:%S%.3f"),
-            message
-        );
-    }
-}

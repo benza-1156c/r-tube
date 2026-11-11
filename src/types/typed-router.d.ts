@@ -44,6 +44,13 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/results/': RouteRecordInfo<
+      '/results/',
+      '/results',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
     '/settings/': RouteRecordInfo<
       '/settings/',
       '/settings',
@@ -56,6 +63,13 @@ declare module 'vue-router/auto-routes' {
       '/subscriptions',
       Record<never, never>,
       Record<never, never>,
+      | never
+    >,
+    '/subscriptions/[id]': RouteRecordInfo<
+      '/subscriptions/[id]',
+      '/subscriptions/:id',
+      { id: ParamValue<true> },
+      { id: ParamValue<false> },
       | never
     >,
     '/trending/': RouteRecordInfo<
@@ -103,6 +117,12 @@ declare module 'vue-router/auto-routes' {
       views:
         | never
     }
+    'src/router/results/index.vue': {
+      routes:
+        | '/results/'
+      views:
+        | never
+    }
     'src/router/settings/index.vue': {
       routes:
         | '/settings/'
@@ -112,6 +132,12 @@ declare module 'vue-router/auto-routes' {
     'src/router/subscriptions/index.vue': {
       routes:
         | '/subscriptions/'
+      views:
+        | never
+    }
+    'src/router/subscriptions/[id].vue': {
+      routes:
+        | '/subscriptions/[id]'
       views:
         | never
     }

@@ -38,9 +38,9 @@ onBeforeUnmount(() => {
         <AppHeader v-if="!shouldHideHeader" :hide-sidebar="shouldHideSidebar" />
 
         <main class="flex-1 overflow-y-auto">
-          <router-view v-slot="{ Component }">
+          <router-view v-slot="{ Component, route: currentRoute }">
             <keep-alive exclude="WatchPage">
-              <component :is="Component" />
+              <component :is="Component" :key="currentRoute.fullPath" />
             </keep-alive>
           </router-view>
         </main>
