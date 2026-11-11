@@ -225,9 +225,18 @@ export function usePlayer() {
     cancelAutoplay();
     upNextVideo.value = null;
 
-    // Immediately stop old video playback so its audio doesn't linger while fetching
-    if (videoElement.value) {
-      stopMediaPlayback(videoElement.value);
+    // Stop the previous video's audio right away, but do not tear the media
+    // down here: detaching the engine and clearing the element's src while the
+    // next video is still being fetched fires a media error, and that error
+    // made `onError` call `recoverStream()` for the *old* video — which bumps
+    // the load token and cancels the load that was just started. Assigning
+    // `currentSrc` below replaces the stream and tears the old one down
+    // cleanly.
+    const previous = videoElement.value;
+    if (previous && !previous.paused) {
+      try {
+        previous.pause();
+      } catch {}
     }
 
     // Pre-fetch the Up Next video directly from YouTube
@@ -408,6 +417,11 @@ export function usePlayer() {
     if (!video || !element || isRecovering) {
       return false;
     }
+    // Never fight a load that is already running: the error that asks for this
+    // recovery usually comes from the previous video being switched out.
+    if (status.value === "loading") {
+      return false;
+    }
     if (!opts.manual && status.value !== "error") {
       return false;
     }
@@ -476,6 +490,12 @@ export function usePlayer() {
 
   function onError(e: Event | unknown): void {
     if (!currentSrc.value) {
+      return;
+    }
+    // Switching videos tears the old stream down, and that teardown can emit a
+    // media error. It is not a playback failure and must never cancel the load
+    // that is already in flight.
+    if (status.value === "loading") {
       return;
     }
     const target = (e as Event)?.target as HTMLElement | null;
