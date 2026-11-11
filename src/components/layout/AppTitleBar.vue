@@ -8,6 +8,7 @@ import { useSettings, type PlaybackMode } from "@/composables/useSettings";
 import { usePlaybackModeNotice } from "@/composables/usePlaybackModeNotice";
 import { usePlayer } from "@/composables/usePlayer";
 import { withResumeAt } from "@/composables/useVideoPage";
+import { goBackInMode } from "@/router";
 
 const router = useRouter();
 const route = useRoute();
@@ -68,11 +69,7 @@ function setPlaybackMode(mode: PlaybackMode): void {
 }
 
 function goBack(): void {
-  if (window.history.length > 1) {
-    router.back();
-  } else {
-    void router.push("/");
-  }
+  goBackInMode();
 }
 
 const isTauri = () => {
