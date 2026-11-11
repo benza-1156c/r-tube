@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { PlaylistItem } from "@/bindings";
+import { useRouter } from "vue-router";
 import { Play, ListMusic } from "@lucide/vue";
+import type { PlaylistItem } from "@/bindings";
 
 const props = defineProps<{
   playlist: PlaylistItem;
@@ -9,10 +10,21 @@ const props = defineProps<{
 const router = useRouter();
 
 function openPlaylist() {
+  router.push({
+    path: "/playlist",
+    query: { list: props.playlist.id },
+  });
+}
+
+function playAll(e: MouseEvent) {
+  e.stopPropagation();
   const videoId = props.playlist.firstVideoId || props.playlist.id;
   router.push({
     path: `/watch/${videoId}`,
-    query: { list: props.playlist.id },
+    query: {
+      list: props.playlist.id,
+      index: "1",
+    },
   });
 }
 </script>
@@ -33,12 +45,14 @@ function openPlaylist() {
         loading="lazy"
       />
 
-      <!-- Play Overlay on Hover -->
+      <!-- Play Overlay on Hover (Instant Play All) -->
       <div
         class="absolute inset-0 flex items-center justify-center bg-black/25 opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+        @click="playAll"
       >
         <div
-          class="flex h-11 w-11 items-center justify-center rounded-full bg-black/60 backdrop-blur-xs text-white"
+          class="flex h-11 w-11 items-center justify-center rounded-full bg-black/75 backdrop-blur-xs text-white hover:scale-110 transition-transform shadow-lg"
+          title="Play all"
         >
           <Play class="h-5 w-5 fill-white translate-x-0.5" />
         </div>
@@ -104,6 +118,14 @@ function openPlaylist() {
           <span v-if="playlist.viewCount">{{ playlist.viewCount }}</span>
           <span v-if="playlist.viewCount && playlist.lastUpdated">•</span>
           <span v-if="playlist.lastUpdated">{{ playlist.lastUpdated }}</span>
+        </div>
+
+        <div class="mt-1">
+          <span
+            class="text-[11px] font-semibold text-muted-foreground group-hover:text-foreground tracking-wide transition-colors"
+          >
+            View full playlist
+          </span>
         </div>
       </div>
     </div>

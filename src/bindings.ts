@@ -18,6 +18,8 @@ export const commands = {
 	getTrending: () => typedError<TrendingFeed_Serialize, AppError_Serialize>(__TAURI_INVOKE("get_trending")),
 	search: (query: string, continuation: string | null) => typedError<SearchResults_Serialize, AppError_Serialize>(__TAURI_INVOKE("search", { query, continuation })),
 	getSearchSuggestions: (query: string) => typedError<SearchSuggestionItem_Serialize[], AppError_Serialize>(__TAURI_INVOKE("get_search_suggestions", { query })),
+	getPlaylist: (playlistId: string) => typedError<PlaylistDetailView_Serialize, AppError_Serialize>(__TAURI_INVOKE("get_playlist", { playlistId })),
+	getPlaylistContinuation: (continuation: string) => typedError<PlaylistContinuationResult_Serialize, AppError_Serialize>(__TAURI_INVOKE("get_playlist_continuation", { continuation })),
 	getVideoInfo: (videoId: string) => typedError<PlayerResponse_Serialize, AppError_Serialize>(__TAURI_INVOKE("get_video_info", { videoId })),
 	getWatchNext: (videoId: string) => typedError<WatchNextResults_Serialize, AppError_Serialize>(__TAURI_INVOKE("get_watch_next", { videoId })),
 	getAccountInfo: () => typedError<CurrentUserProfile_Serialize, AppError_Serialize>(__TAURI_INVOKE("get_account_info")),
@@ -177,6 +179,52 @@ export type PlayerResponse_Serialize = {
 	captions: CaptionTrack[],
 };
 
+export type PlaylistContinuationResult = PlaylistContinuationResult_Serialize | PlaylistContinuationResult_Deserialize;
+
+export type PlaylistContinuationResult_Deserialize = {
+	videos: PlaylistVideoItem_Deserialize[],
+	continuationToken?: string | null,
+};
+
+export type PlaylistContinuationResult_Serialize = {
+	videos: PlaylistVideoItem_Serialize[],
+	continuationToken: string | null,
+};
+
+export type PlaylistDetailView = PlaylistDetailView_Serialize | PlaylistDetailView_Deserialize;
+
+export type PlaylistDetailView_Deserialize = {
+	id: string,
+	title: string,
+	author?: string | null,
+	authorId?: string | null,
+	authorAvatarUrl?: string | null,
+	description?: string | null,
+	videoCount?: number | null,
+	viewCount?: string | null,
+	lastUpdated?: string | null,
+	thumbnail?: string | null,
+	videos: PlaylistVideoItem_Deserialize[],
+	continuationToken?: string | null,
+	isEditable: boolean,
+};
+
+export type PlaylistDetailView_Serialize = {
+	id: string,
+	title: string,
+	author: string | null,
+	authorId: string | null,
+	authorAvatarUrl: string | null,
+	description: string | null,
+	videoCount: number | null,
+	viewCount: string | null,
+	lastUpdated: string | null,
+	thumbnail: string | null,
+	videos: PlaylistVideoItem_Serialize[],
+	continuationToken: string | null,
+	isEditable: boolean,
+};
+
 export type PlaylistItem = PlaylistItem_Serialize | PlaylistItem_Deserialize;
 
 export type PlaylistItem_Deserialize = {
@@ -205,6 +253,32 @@ export type PlaylistItem_Serialize = {
 	badgeText: string,
 };
 
+export type PlaylistVideoItem = PlaylistVideoItem_Serialize | PlaylistVideoItem_Deserialize;
+
+export type PlaylistVideoItem_Deserialize = {
+	id: string,
+	title: string,
+	author: string,
+	authorId?: string | null,
+	duration?: string | null,
+	durationMs?: number | null,
+	thumbnail?: string | null,
+	index?: number | null,
+	isPlayable: boolean,
+};
+
+export type PlaylistVideoItem_Serialize = {
+	id: string,
+	title: string,
+	author: string,
+	authorId: string | null,
+	duration: string | null,
+	durationMs: number | null,
+	thumbnail: string | null,
+	index: number | null,
+	isPlayable: boolean,
+};
+
 export type SearchResults = SearchResults_Serialize | SearchResults_Deserialize;
 
 export type SearchResults_Deserialize = {
@@ -228,6 +302,7 @@ export type SearchSuggestionItem_Deserialize = {
 	subtitle?: string | null,
 	thumbnail?: string | null,
 	isHistory: boolean,
+	channelId?: string | null,
 };
 
 export type SearchSuggestionItem_Serialize = {
@@ -235,6 +310,7 @@ export type SearchSuggestionItem_Serialize = {
 	subtitle: string | null,
 	thumbnail: string | null,
 	isHistory: boolean,
+	channelId: string | null,
 };
 
 export type TrendingFeed = TrendingFeed_Serialize | TrendingFeed_Deserialize;

@@ -1,20 +1,21 @@
 <script setup lang="ts">
 import { ref, watch } from "vue";
 import { useRouter, useRoute } from "vue-router";
-import { Search, X } from "@lucide/vue";
+import { Search, History, X } from "@lucide/vue";
 import { useDebounceFn, onClickOutside } from "@vueuse/core";
-import { commands } from "@/bindings";
+import { commands, type SearchSuggestionItem } from "@/bindings";
 
 const router = useRouter();
 const route = useRoute();
 
 const searchQuery = ref("");
-const suggestions = ref<string[]>([]);
+const suggestions = ref<SearchSuggestionItem[]>([]);
 const showSuggestions = ref(false);
 const selectedIndex = ref(-1);
 const isInputFocused = ref(false);
 const searchContainerRef = ref<HTMLElement | null>(null);
 
+// Synchronize search input if route has search_query
 watch(
   () => route.query.search_query,
   (newQuery) => {
@@ -90,8 +91,8 @@ function handleSearch(targetQuery?: string) {
   });
 }
 
-function selectSuggestion(sug: string) {
-  handleSearch(sug);
+function selectSuggestion(sug: SearchSuggestionItem) {
+  handleSearch(sug.text);
 }
 
 function clearSearch() {
@@ -129,18 +130,18 @@ function handleKeyDown(e: KeyboardEvent) {
   if (e.key === "ArrowDown") {
     e.preventDefault();
     selectedIndex.value = (selectedIndex.value + 1) % suggestions.value.length;
-    searchQuery.value = suggestions.value[selectedIndex.value];
+    searchQuery.value = suggestions.value[selectedIndex.value].text;
   } else if (e.key === "ArrowUp") {
     e.preventDefault();
     selectedIndex.value =
       selectedIndex.value <= 0
         ? suggestions.value.length - 1
         : selectedIndex.value - 1;
-    searchQuery.value = suggestions.value[selectedIndex.value];
+    searchQuery.value = suggestions.value[selectedIndex.value].text;
   } else if (e.key === "Enter") {
     e.preventDefault();
     if (selectedIndex.value >= 0 && suggestions.value[selectedIndex.value]) {
-      handleSearch(suggestions.value[selectedIndex.value]);
+      handleSearch(suggestions.value[selectedIndex.value].text);
     } else {
       handleSearch();
     }
@@ -181,24 +182,52 @@ function handleKeyDown(e: KeyboardEvent) {
       </button>
     </div>
 
-    <!-- Suggestions Dropdown -->
+    <!-- Suggestions Dropdown (YouTube Style with thumbnails & subtitles) -->
     <div
       v-if="showSuggestions && suggestions.length > 0"
       class="absolute top-full left-0 right-0 mt-1.5 z-50 rounded-xl border border-border/40 bg-popover/95 text-popover-foreground shadow-2xl backdrop-blur-md overflow-hidden py-1.5"
     >
       <div
         v-for="(sug, idx) in suggestions"
-        :key="sug"
-        class="flex items-center gap-3 px-3.5 py-2 text-sm cursor-pointer transition-colors"
+        :key="`${sug.text}-${idx}`"
+        class="flex items-center justify-between gap-3 px-3.5 py-2 text-sm cursor-pointer transition-colors"
         :class="
           selectedIndex === idx
             ? 'bg-accent text-accent-foreground font-medium'
-            : 'hover:bg-accent/60'
+            : 'hover:bg-accent/60 text-foreground'
         "
         @mousedown.prevent="selectSuggestion(sug)"
       >
-        <Search class="h-4 w-4 text-muted-foreground shrink-0" />
-        <span class="truncate">{{ sug }}</span>
+        <!-- Left: Icon (History / Search) + Text & Subtitle -->
+        <div class="flex items-center gap-3 min-w-0 flex-1">
+          <History
+            v-if="sug.isHistory"
+            class="h-4 w-4 text-muted-foreground shrink-0"
+          />
+          <Search v-else class="h-4 w-4 text-muted-foreground shrink-0" />
+
+          <div class="flex flex-col min-w-0 flex-1">
+            <span class="truncate font-medium text-sm leading-tight">
+              {{ sug.text }}
+            </span>
+            <span
+              v-if="sug.subtitle"
+              class="text-xs text-muted-foreground truncate leading-tight mt-0.5"
+            >
+              {{ sug.subtitle }}
+            </span>
+          </div>
+        </div>
+
+        <!-- Right: Thumbnail (Cover / Avatar / Video) -->
+        <div v-if="sug.thumbnail" class="shrink-0 ml-3">
+          <img
+            :src="sug.thumbnail"
+            :alt="sug.text"
+            class="h-7 w-12 rounded object-cover shadow-xs border border-border/30 bg-muted"
+            loading="lazy"
+          />
+        </div>
       </div>
     </div>
   </div>

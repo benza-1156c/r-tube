@@ -40,6 +40,7 @@ pub struct SearchSuggestionItem {
     pub subtitle: Option<String>,
     pub thumbnail: Option<String>,
     pub is_history: bool,
+    pub channel_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
@@ -126,6 +127,45 @@ pub struct CurrentUserProfile {
     pub name: String,
     pub avatar_url: Option<String>,
     pub channel_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct PlaylistDetailView {
+    pub id: String,
+    pub title: String,
+    pub author: Option<String>,
+    pub author_id: Option<String>,
+    pub author_avatar_url: Option<String>,
+    pub description: Option<String>,
+    pub video_count: Option<u32>,
+    pub view_count: Option<String>,
+    pub last_updated: Option<String>,
+    pub thumbnail: Option<String>,
+    pub videos: Vec<PlaylistVideoItem>,
+    pub continuation_token: Option<String>,
+    pub is_editable: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct PlaylistVideoItem {
+    pub id: String,
+    pub title: String,
+    pub author: String,
+    pub author_id: Option<String>,
+    pub duration: Option<String>,
+    pub duration_ms: Option<f64>,
+    pub thumbnail: Option<String>,
+    pub index: Option<u32>,
+    pub is_playable: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct PlaylistContinuationResult {
+    pub videos: Vec<PlaylistVideoItem>,
+    pub continuation_token: Option<String>,
 }
 
 // ---------------------------------------------------------------------------
@@ -438,6 +478,75 @@ impl From<innertube_rs::WatchNextResults> for WatchNextResults {
             current_author: res.current_author,
             related_videos,
             continuation_token: res.continuation_token,
+        }
+    }
+}
+
+impl From<&innertube_rs::PlaylistVideoItem> for PlaylistVideoItem {
+    fn from(pv: &innertube_rs::PlaylistVideoItem) -> Self {
+        Self {
+            id: pv.id.clone(),
+            title: pv.title.clone(),
+            author: pv.author.clone(),
+            author_id: pv.author_id.clone(),
+            duration: pv.duration.clone(),
+            duration_ms: pv.duration_ms.map(|ms| ms as f64),
+            thumbnail: pv.thumbnail.clone(),
+            index: pv.index,
+            is_playable: pv.is_playable,
+        }
+    }
+}
+
+impl From<innertube_rs::SearchSuggestion> for SearchSuggestionItem {
+    fn from(s: innertube_rs::SearchSuggestion) -> Self {
+        Self {
+            text: s.text,
+            subtitle: s.subtitle,
+            thumbnail: s.thumbnail,
+            is_history: s.is_history,
+            channel_id: s.channel_id,
+        }
+    }
+}
+
+impl From<&innertube_rs::SearchSuggestion> for SearchSuggestionItem {
+    fn from(s: &innertube_rs::SearchSuggestion) -> Self {
+        Self {
+            text: s.text.clone(),
+            subtitle: s.subtitle.clone(),
+            thumbnail: s.thumbnail.clone(),
+            is_history: s.is_history,
+            channel_id: s.channel_id.clone(),
+        }
+    }
+}
+
+impl From<innertube_rs::PlaylistView> for PlaylistDetailView {
+    fn from(pv: innertube_rs::PlaylistView) -> Self {
+        Self {
+            id: pv.id,
+            title: pv.title,
+            author: pv.author,
+            author_id: pv.author_id,
+            author_avatar_url: None,
+            description: pv.description,
+            video_count: pv.video_count,
+            view_count: pv.view_count,
+            last_updated: pv.last_updated,
+            thumbnail: pv.thumbnail,
+            videos: pv.videos.iter().map(PlaylistVideoItem::from).collect(),
+            continuation_token: pv.continuation_token,
+            is_editable: pv.is_editable,
+        }
+    }
+}
+
+impl From<innertube_rs::PlaylistContinuation> for PlaylistContinuationResult {
+    fn from(pc: innertube_rs::PlaylistContinuation) -> Self {
+        Self {
+            videos: pc.videos.iter().map(PlaylistVideoItem::from).collect(),
+            continuation_token: pc.continuation_token,
         }
     }
 }
