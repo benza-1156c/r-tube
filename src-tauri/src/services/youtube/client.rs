@@ -39,33 +39,81 @@ pub struct CurrentUserProfile {
 
 #[derive(Clone)]
 pub struct YoutubeClient {
-    innertube: Arc<RwLock<Innertube>>,
-    anon_innertube: Arc<Innertube>,
-    pub cookie_manager: CookieManager,
-    active_profile_id: Arc<RwLock<Option<i32>>>,
-    last_video_info: Arc<RwLock<Option<VideoInfo>>>,
-    audio_cache: Arc<RwLock<HashMap<String, CachedAudio>>>,
+    inner: Arc<ClientInner>,
+}
+
+struct ClientInner {
+    /// Options the signed-in client is built from. Kept so building it can be
+    /// deferred until the first request instead of blocking app startup.
+    options: RwLock<SessionOptions>,
+    signed: RwLock<Option<Arc<Innertube>>>,
+    anon: RwLock<Option<Arc<Innertube>>>,
+    cookie_manager: CookieManager,
+    active_profile_id: RwLock<Option<i32>>,
+    last_video_info: RwLock<Option<VideoInfo>>,
+    audio_cache: RwLock<HashMap<String, CachedAudio>>,
 }
 
 impl YoutubeClient {
+    /// Cheap construction: the InnerTube clients are built on first use, so the
+    /// window is never blocked on YouTube's bootstrap requests during startup.
     pub async fn new() -> Result<Self, AppError> {
         let _ = crate::utils::proxy::ensure_proxy().await;
 
-        let innertube = Innertube::new()
-            .await
-            .map_err(|e| AppError::Internal(format!("Failed to initialize InnerTube: {e}")))?;
-        let anon_innertube = Innertube::new()
-            .await
-            .map_err(|e| AppError::Internal(format!("Failed to initialize Anon InnerTube: {e}")))?;
-
         Ok(Self {
-            innertube: Arc::new(RwLock::new(innertube)),
-            anon_innertube: Arc::new(anon_innertube),
-            cookie_manager: CookieManager::new(None),
-            active_profile_id: Arc::new(RwLock::new(None)),
-            last_video_info: Arc::new(RwLock::new(None)),
-            audio_cache: Arc::new(RwLock::new(HashMap::new())),
+            inner: Arc::new(ClientInner {
+                options: RwLock::new(SessionOptions::default()),
+                signed: RwLock::new(None),
+                anon: RwLock::new(None),
+                cookie_manager: CookieManager::new(None),
+                active_profile_id: RwLock::new(None),
+                last_video_info: RwLock::new(None),
+                audio_cache: RwLock::new(HashMap::new()),
+            }),
         })
+    }
+
+    /// Build both clients in the background so the first page is not the one
+    /// paying for them.
+    pub async fn warm_up(&self) {
+        let _ = futures_util::join!(self.signed(), self.anon());
+    }
+
+    /// Signed-in client, created on first use and cached afterwards.
+    async fn signed(&self) -> Result<Arc<Innertube>, AppError> {
+        if let Some(client) = self.inner.signed.read().await.clone() {
+            return Ok(client);
+        }
+
+        let mut slot = self.inner.signed.write().await;
+        if let Some(client) = slot.clone() {
+            return Ok(client);
+        }
+
+        let options = self.inner.options.read().await.clone();
+        let client = Arc::new(Innertube::with_options(options).await.map_err(|e| {
+            AppError::Internal(format!("Failed to initialize InnerTube: {e}"))
+        })?);
+        *slot = Some(client.clone());
+        Ok(client)
+    }
+
+    /// Anonymous client used for playback metadata and audio streams.
+    async fn anon(&self) -> Result<Arc<Innertube>, AppError> {
+        if let Some(client) = self.inner.anon.read().await.clone() {
+            return Ok(client);
+        }
+
+        let mut slot = self.inner.anon.write().await;
+        if let Some(client) = slot.clone() {
+            return Ok(client);
+        }
+
+        let client = Arc::new(Innertube::new().await.map_err(|e| {
+            AppError::Internal(format!("Failed to initialize Anonymous InnerTube: {e}"))
+        })?);
+        *slot = Some(client.clone());
+        Ok(client)
     }
 
     /// Initialize or reload the client from the active profile stored in SQLite
@@ -80,7 +128,7 @@ impl YoutubeClient {
             if !cookie_str.is_empty() {
                 self.load_session(Some(prof.id), cookie_str).await?;
             } else {
-                *self.active_profile_id.write().await = Some(prof.id);
+                *self.inner.active_profile_id.write().await = Some(prof.id);
             }
         }
 
@@ -100,14 +148,13 @@ impl YoutubeClient {
             ..Default::default()
         };
 
-        let new_client = Innertube::with_options(options).await.map_err(|e| {
-            AppError::Internal(format!("Failed to configure InnerTube session: {e}"))
-        })?;
+        // Store the session and drop the built client; the next request rebuilds
+        // it with these cookies. No network work happens on a profile switch.
+        *self.inner.options.write().await = options;
+        *self.inner.signed.write().await = None;
 
-        self.cookie_manager.set_cookies(cookie_str).await;
-
-        *self.innertube.write().await = new_client;
-        *self.active_profile_id.write().await = profile_id;
+        self.inner.cookie_manager.set_cookies(cookie_str).await;
+        *self.inner.active_profile_id.write().await = profile_id;
 
         Ok(())
     }
@@ -119,7 +166,7 @@ impl YoutubeClient {
         payload: Value,
         db: Option<&DatabaseConnection>,
     ) -> Result<Value, AppError> {
-        let yt = self.innertube.read().await;
+        let yt = self.signed().await?;
         let response = yt
             .session
             .post_innertube(endpoint, payload)
@@ -127,8 +174,9 @@ impl YoutubeClient {
             .map_err(|e| AppError::Internal(format!("InnerTube request failed: {e}")))?;
 
         if let Some(db) = db {
-            let active_id = *self.active_profile_id.read().await;
+            let active_id = *self.inner.active_profile_id.read().await;
             let _ = self
+                .inner
                 .cookie_manager
                 .sync_from_headers(response.headers(), active_id, db)
                 .await;
@@ -147,7 +195,7 @@ impl YoutubeClient {
         continuation_token: Option<&str>,
         params: Option<&str>,
     ) -> Result<HomeFeed, AppError> {
-        let yt = self.innertube.read().await;
+        let yt = self.signed().await?;
         let token = continuation_token.or(params);
         if let Some(t) = token {
             yt.get_home_feed_continuation(t).await.map_err(|e| {
@@ -162,7 +210,7 @@ impl YoutubeClient {
 
     /// Fetch YouTube Subscriptions Feed
     pub async fn get_subscriptions_feed(&self) -> Result<BrowseFeed, AppError> {
-        let yt = self.innertube.read().await;
+        let yt = self.signed().await?;
         yt.get_subscriptions_feed()
             .await
             .map_err(|e| AppError::Internal(format!("Failed to fetch subscriptions feed: {e}")))
@@ -170,7 +218,7 @@ impl YoutubeClient {
 
     /// Fetch YouTube Trending Feed
     pub async fn get_trending(&self) -> Result<TrendingFeed, AppError> {
-        let yt = self.innertube.read().await;
+        let yt = self.signed().await?;
         yt.get_trending(None)
             .await
             .map_err(|e| AppError::Internal(format!("Failed to fetch trending feed: {e}")))
@@ -182,7 +230,7 @@ impl YoutubeClient {
         query: &str,
         continuation_token: Option<&str>,
     ) -> Result<SearchResults, AppError> {
-        let yt = self.innertube.read().await;
+        let yt = self.signed().await?;
         yt.search(query, continuation_token)
             .await
             .map_err(|e| AppError::Internal(format!("YouTube search failed: {e}")))
@@ -190,7 +238,7 @@ impl YoutubeClient {
 
     /// Fetch full YouTube playlist details
     pub async fn get_playlist(&self, playlist_id: &str) -> Result<PlaylistDetailView, AppError> {
-        let yt = self.innertube.read().await;
+        let yt = self.signed().await?;
         yt.get_playlist(playlist_id)
             .await
             .map(PlaylistDetailView::from)
@@ -202,7 +250,7 @@ impl YoutubeClient {
         &self,
         token: &str,
     ) -> Result<PlaylistContinuationResult, AppError> {
-        let yt = self.innertube.read().await;
+        let yt = self.signed().await?;
         yt.get_playlist_continuation(token)
             .await
             .map(PlaylistContinuationResult::from)
@@ -214,7 +262,7 @@ impl YoutubeClient {
         &self,
         query: &str,
     ) -> Result<Vec<SearchSuggestionItem>, AppError> {
-        let yt = self.innertube.read().await;
+        let yt = self.signed().await?;
         let res = yt
             .get_search_suggestions(query, false)
             .await
@@ -234,7 +282,7 @@ impl YoutubeClient {
             .map_err(|e| AppError::Internal(format!("Local stream proxy unavailable: {e}")))?;
 
         let raw = {
-            let yt = self.innertube.read().await;
+            let yt = self.signed().await?;
             yt.get_basic_info(video_id, None)
                 .await
                 .map_err(|e| AppError::Internal(format!("Failed to get video info: {e}")))?
@@ -243,7 +291,7 @@ impl YoutubeClient {
         // Keep the playback session data (cpn + tracking URLs) for the
         // history and watch-time events this video will report.
         {
-            let mut cached = self.last_video_info.write().await;
+            let mut cached = self.inner.last_video_info.write().await;
             *cached = Some(raw.clone());
         }
 
@@ -253,29 +301,31 @@ impl YoutubeClient {
             .await
             .map(|raw| crate::utils::proxy::wrap_hls_url(&raw, video_id));
 
-        if let Ok(tracks) = self.anon_innertube.get_transcript_tracks(video_id).await {
-            player_res.captions = tracks
-                .into_iter()
-                .map(|t| CaptionTrack {
-                    language_code: t.language_code,
-                    name: t.name,
-                    vtt_url: format!("{}&fmt=vtt", t.base_url),
-                })
-                .collect();
+        if let Ok(anon) = self.anon().await {
+            if let Ok(tracks) = anon.get_transcript_tracks(video_id).await {
+                player_res.captions = tracks
+                    .into_iter()
+                    .map(|t| CaptionTrack {
+                        language_code: t.language_code,
+                        name: t.name,
+                        vtt_url: format!("{}&fmt=vtt", t.base_url),
+                    })
+                    .collect();
+            }
         }
 
         Ok(player_res)
     }
 
     pub async fn hls_manifest_url(&self, video_id: &str) -> Option<String> {
+        let anon = self.anon().await.ok()?;
         for client in ["VISIONOS", "IOS", "ANDROID"] {
             let options = innertube_rs::GetVideoInfoOptions {
                 client: Some(client.to_string()),
                 po_token: None,
                 playback_context: None,
             };
-            match self
-                .anon_innertube
+            match anon
                 .get_basic_info(video_id, Some(&options))
                 .await
             {
@@ -304,14 +354,14 @@ impl YoutubeClient {
     ) -> Result<AudioStreamInfo, AppError> {
         let key = format!("{video_id}:{}", language.unwrap_or_default());
 
-        if let Some(cached) = self.audio_cache.read().await.get(&key) {
+        if let Some(cached) = self.inner.audio_cache.read().await.get(&key) {
             if cached.at.elapsed() < AUDIO_CACHE_TTL {
                 return Ok(cached.info.clone());
             }
         }
 
         let info = self.resolve_audio(video_id, language, None).await?;
-        self.audio_cache.write().await.insert(
+        self.inner.audio_cache.write().await.insert(
             key,
             CachedAudio {
                 at: Instant::now(),
@@ -360,10 +410,11 @@ impl YoutubeClient {
 
         // The response comes from the anonymous VISIONOS client, so the
         // decipherer and PO token must come from that session too.
+        let anon = self.anon().await?;
         let url = innertube_rs::endpoints::player::resolve_stream_url_full(
             &format,
-            &self.anon_innertube.player.decipherer,
-            self.anon_innertube.session.po_token.as_deref(),
+            &anon.player.decipherer,
+            anon.session.po_token.as_deref(),
             None,
         )
         .map_err(|e| AppError::Internal(format!("Failed to resolve audio stream: {e}")))?;
@@ -426,6 +477,7 @@ impl YoutubeClient {
         video_id: &str,
     ) -> Result<innertube_rs::PlayerResponse, AppError> {
         let mut fallback: Option<innertube_rs::PlayerResponse> = None;
+        let anon = self.anon().await?;
 
         for client in ["VISIONOS", "ANDROID_VR", "MWEB", "WEB"] {
             let options = innertube_rs::GetVideoInfoOptions {
@@ -433,8 +485,7 @@ impl YoutubeClient {
                 po_token: None,
                 playback_context: None,
             };
-            match self
-                .anon_innertube
+            match anon
                 .get_basic_info(video_id, Some(&options))
                 .await
             {
@@ -462,9 +513,8 @@ impl YoutubeClient {
         // Restricted videos may only answer a signed-in session. Their URLs may
         // not be seekable, but playing is better than failing outright.
         let info = self
-            .innertube
-            .read()
-            .await
+            .signed()
+            .await?
             .get_basic_info(video_id, None)
             .await
             .map_err(|e| AppError::Internal(format!("Failed to get video info: {e}")))?;
@@ -478,7 +528,7 @@ impl YoutubeClient {
         playlist_id: Option<&str>,
         playlist_index: Option<usize>,
     ) -> Result<WatchNextResults, AppError> {
-        let yt = self.innertube.read().await;
+        let yt = self.signed().await?;
         let res = if let Some(pl_id) = playlist_id {
             yt.get_playlist_watch_next(video_id, pl_id, playlist_index)
                 .await
@@ -494,18 +544,18 @@ impl YoutubeClient {
     /// Player session data for a video: the cached one when it matches, a
     /// fresh one otherwise (history can be reported without a prior load).
     async fn playback_info(&self, video_id: &str) -> Result<VideoInfo, AppError> {
-        if let Some(info) = self.last_video_info.read().await.as_ref() {
+        if let Some(info) = self.inner.last_video_info.read().await.as_ref() {
             if info.id() == Some(video_id) {
                 return Ok(info.clone());
             }
         }
 
-        let yt = self.innertube.read().await;
+        let yt = self.signed().await?;
         let info = yt
             .get_basic_info(video_id, None)
             .await
             .map_err(|e| AppError::Internal(format!("Failed to get video info: {e}")))?;
-        *self.last_video_info.write().await = Some(info.clone());
+        *self.inner.last_video_info.write().await = Some(info.clone());
         Ok(info)
     }
 
@@ -513,7 +563,7 @@ impl YoutubeClient {
     /// signed-in account's watch history.
     pub async fn record_watch_start(&self, video_id: &str) -> Result<(), AppError> {
         let info = self.playback_info(video_id).await?;
-        let yt = self.innertube.read().await;
+        let yt = self.signed().await?;
         info.add_to_watch_history(yt.session.as_ref())
             .await
             .map_err(|e| AppError::Internal(format!("Failed to record watch history: {e}")))?;
@@ -523,7 +573,7 @@ impl YoutubeClient {
     /// Report playback progress so the resume position is remembered.
     pub async fn record_watch_time(&self, video_id: &str, seconds: f64) -> Result<(), AppError> {
         let info = self.playback_info(video_id).await?;
-        let yt = self.innertube.read().await;
+        let yt = self.signed().await?;
         info.update_watch_time(yt.session.as_ref(), seconds)
             .await
             .map_err(|e| AppError::Internal(format!("Failed to update watch time: {e}")))?;
@@ -532,7 +582,7 @@ impl YoutubeClient {
 
     /// Watch history of the signed-in account, newest first.
     pub async fn get_history(&self) -> Result<Vec<VideoItem>, AppError> {
-        let yt = self.innertube.read().await;
+        let yt = self.signed().await?;
         let feed = yt
             .get_history(None)
             .await
@@ -546,8 +596,8 @@ impl YoutubeClient {
         headers: &HeaderMap,
         db: &DatabaseConnection,
     ) -> Result<Option<String>, AppError> {
-        let active_id = *self.active_profile_id.read().await;
-        self.cookie_manager
+        let active_id = *self.inner.active_profile_id.read().await;
+        self.inner.cookie_manager
             .sync_from_headers(headers, active_id, db)
             .await
     }
@@ -699,7 +749,7 @@ impl YoutubeClient {
         }
 
         if name.is_none() {
-            let yt = self.innertube.read().await;
+            let yt = self.signed().await?;
             if let Ok(accounts) = yt.account().get_accounts().await {
                 if let Some(acc) = accounts
                     .iter()
@@ -914,5 +964,18 @@ mod tests {
 
         let picked = pick_audio_format(&formats, None, None).expect("an audio format");
         assert!(picked.audio_track.unwrap().audio_is_default);
+    }
+
+    /// Startup must not wait on YouTube: constructing the client is pure setup,
+    /// the InnerTube handshake happens later (warm-up or the first request).
+    #[tokio::test]
+    async fn client_construction_does_not_hit_the_network() {
+        let started = std::time::Instant::now();
+        let _client = YoutubeClient::new().await.expect("Failed to create client");
+        let elapsed = started.elapsed();
+        assert!(
+            elapsed.as_millis() < 500,
+            "YoutubeClient::new blocked startup for {elapsed:?}"
+        );
     }
 }

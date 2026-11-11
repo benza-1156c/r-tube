@@ -61,6 +61,13 @@ pub fn run() {
 
                 let _ = yt.init_from_active_profile(&db).await;
 
+                // Build the InnerTube clients off the UI thread: they fetch and
+                // parse YouTube's player script, which used to stall startup.
+                let warm = std::sync::Arc::clone(&yt);
+                tauri::async_runtime::spawn(async move {
+                    warm.warm_up().await;
+                });
+
                 let initial_settings = models::settings::AppSettings::load_from_store(&app_handle);
                 let settings = std::sync::Arc::new(tokio::sync::RwLock::new(initial_settings));
 
