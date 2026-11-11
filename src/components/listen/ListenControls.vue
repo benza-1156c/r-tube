@@ -70,112 +70,96 @@ function handleVolumeInput(e: Event) {
 </script>
 
 <template>
-  <div class="w-full flex flex-col items-center mt-6 select-none max-w-lg mx-auto">
-    <!-- Scrubber Progress Bar -->
-    <div class="w-full px-2">
-      <div class="relative flex items-center group">
-        <input
-          type="range"
-          min="0"
-          :max="duration || 100"
-          :value="displayTime"
-          step="0.5"
-          aria-label="Seek track position"
-          class="w-full h-1.5 bg-muted rounded-lg appearance-none cursor-pointer accent-primary group-hover:h-2 transition-all"
-          @input="handleSeekInput"
-          @change="handleSeekChange"
-        />
-      </div>
-
-      <div
-        class="flex justify-between text-xs text-muted-foreground font-mono mt-1.5"
+  <div class="mx-auto mt-4 w-full max-w-lg select-none">
+    <!-- Scrubber: time, bar and duration share one line -->
+    <div class="flex items-center gap-3">
+      <span
+        class="w-11 shrink-0 text-right text-[11px] tabular-nums text-muted-foreground"
       >
-        <span>{{ formatTime(displayTime) }}</span>
-        <span>{{ formatTime(duration) }}</span>
-      </div>
-    </div>
-
-    <!-- Playback Control Buttons -->
-    <div class="flex items-center justify-center gap-6 mt-4 w-full">
-      <!-- Previous Track -->
-      <button
-        type="button"
-        class="p-2.5 rounded-full text-foreground/80 hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
-        title="Previous"
-        aria-label="Previous track"
-        @click="emit('previous')"
-      >
-        <SkipBack class="h-5 w-5" />
-      </button>
-
-      <!-- Play / Pause Button -->
-      <button
-        type="button"
-        class="h-14 w-14 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:scale-105 active:scale-95 transition-transform shadow-lg cursor-pointer"
-        :title="isPlaying ? 'Pause' : 'Play'"
-        :aria-label="isPlaying ? 'Pause' : 'Play'"
-        @click="emit('togglePlay')"
-      >
-        <Loader2
-          v-if="isLoading"
-          class="h-6 w-6 animate-spin text-primary-foreground"
-        />
-        <Pause
-          v-else-if="isPlaying"
-          class="h-6 w-6 fill-current"
-        />
-        <Play
-          v-else
-          class="h-6 w-6 fill-current translate-x-0.5"
-        />
-      </button>
-
-      <!-- Next Track -->
-      <button
-        type="button"
-        class="p-2.5 rounded-full text-foreground/80 hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
-        title="Next"
-        aria-label="Next track"
-        @click="emit('next')"
-      >
-        <SkipForward class="h-5 w-5" />
-      </button>
-    </div>
-
-    <!-- Volume Control -->
-    <div class="flex items-center gap-3 mt-4 w-44 text-muted-foreground">
-      <button
-        type="button"
-        class="p-1 hover:text-foreground transition-colors cursor-pointer"
-        :title="isMuted || volume === 0 ? 'Unmute' : 'Mute'"
-        :aria-label="isMuted || volume === 0 ? 'Unmute' : 'Mute'"
-        @click="emit('toggleMute')"
-      >
-        <VolumeX
-          v-if="isMuted || volume === 0"
-          class="h-4 w-4"
-        />
-        <Volume1
-          v-else-if="volume < 0.5"
-          class="h-4 w-4"
-        />
-        <Volume2
-          v-else
-          class="h-4 w-4"
-        />
-      </button>
+        {{ formatTime(displayTime) }}
+      </span>
 
       <input
         type="range"
         min="0"
-        max="1"
-        step="0.01"
-        :value="isMuted ? 0 : volume"
-        aria-label="Volume slider"
-        class="w-full h-1 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
-        @input="handleVolumeInput"
+        :max="duration || 100"
+        :value="displayTime"
+        step="0.5"
+        aria-label="Seek track position"
+        class="h-1 min-w-0 flex-1 cursor-pointer appearance-none rounded-full bg-muted accent-primary transition-[height] hover:h-1.5"
+        @input="handleSeekInput"
+        @change="handleSeekChange"
       />
+
+      <span
+        class="w-11 shrink-0 text-[11px] tabular-nums text-muted-foreground"
+      >
+        {{ formatTime(duration) }}
+      </span>
+    </div>
+
+    <!-- Transport (centered) and volume (right) share the same row -->
+    <div class="mt-2 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+      <div aria-hidden="true" />
+
+      <div class="flex items-center gap-5">
+        <button
+          type="button"
+          class="rounded-full p-2 text-foreground/75 transition-colors hover:bg-muted/60 hover:text-foreground cursor-pointer"
+          title="Previous"
+          aria-label="Previous track"
+          @click="emit('previous')"
+        >
+          <SkipBack class="h-4 w-4" />
+        </button>
+
+        <button
+          type="button"
+          class="flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md transition-transform hover:scale-105 active:scale-95 cursor-pointer"
+          :title="isPlaying ? 'Pause' : 'Play'"
+          :aria-label="isPlaying ? 'Pause' : 'Play'"
+          @click="emit('togglePlay')"
+        >
+          <Loader2 v-if="isLoading" class="h-5 w-5 animate-spin" />
+          <Pause v-else-if="isPlaying" class="h-5 w-5 fill-current" />
+          <Play v-else class="h-5 w-5 translate-x-0.5 fill-current" />
+        </button>
+
+        <button
+          type="button"
+          class="rounded-full p-2 text-foreground/75 transition-colors hover:bg-muted/60 hover:text-foreground cursor-pointer"
+          title="Next"
+          aria-label="Next track"
+          @click="emit('next')"
+        >
+          <SkipForward class="h-4 w-4" />
+        </button>
+      </div>
+
+      <div class="flex items-center justify-end gap-1.5">
+        <button
+          type="button"
+          class="rounded-full p-1.5 text-muted-foreground transition-colors hover:text-foreground cursor-pointer"
+          :title="isMuted || volume === 0 ? 'Unmute' : 'Mute'"
+          :aria-label="isMuted || volume === 0 ? 'Unmute' : 'Mute'"
+          @click="emit('toggleMute')"
+        >
+          <VolumeX v-if="isMuted || volume === 0" class="h-4 w-4" />
+          <Volume1 v-else-if="volume < 0.5" class="h-4 w-4" />
+          <Volume2 v-else class="h-4 w-4" />
+        </button>
+
+        <input
+          type="range"
+          min="0"
+          max="1"
+          step="0.01"
+          :value="isMuted ? 0 : volume"
+          aria-label="Volume slider"
+          class="hidden h-1 w-20 cursor-pointer appearance-none rounded-full bg-muted accent-primary sm:block lg:w-24"
+          @input="handleVolumeInput"
+        />
+      </div>
     </div>
   </div>
 </template>
-

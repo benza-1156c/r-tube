@@ -6,12 +6,6 @@ import { useAudioPlayer } from "@/composables/useAudioPlayer";
 import { useSettings } from "@/composables/useSettings";
 import { useVideoPage, resumeFromQuery } from "@/composables/useVideoPage";
 
-import ListenArtwork from "@/components/listen/ListenArtwork.vue";
-import ListenTrackInfo from "@/components/listen/ListenTrackInfo.vue";
-import ListenControls from "@/components/listen/ListenControls.vue";
-import ListenRelated from "@/components/listen/ListenRelated.vue";
-import ListenCaptions from "@/components/audio/ListenCaptions.vue";
-
 import { ChevronDown, ChevronUp, AlertCircle, Clapperboard } from "@lucide/vue";
 
 defineOptions({ name: "ListenPage" });
@@ -263,13 +257,6 @@ function switchToVideo(): void {
           v-if="player.currentVideo.value?.description"
           class="w-full rounded-2xl bg-muted/30 border border-border/40 p-4 mt-8 text-xs leading-relaxed text-foreground/80 transition-all select-none"
         >
-          <div
-            v-if="player.currentVideo.value?.viewCount"
-            class="font-semibold mb-2 text-muted-foreground"
-          >
-            <span>{{ player.currentVideo.value.viewCount }}</span>
-          </div>
-
           <p :class="{ 'line-clamp-3': !isDescriptionExpanded }">
             {{ player.currentVideo.value.description }}
           </p>

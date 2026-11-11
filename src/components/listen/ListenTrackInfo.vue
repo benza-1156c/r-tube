@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { CheckCircle2, ThumbsUp, Share2, Bookmark } from "@lucide/vue";
+import { CheckCircle2 } from "@lucide/vue";
 
 defineOptions({ name: "ListenTrackInfo" });
 
@@ -12,16 +12,16 @@ defineProps<{
 </script>
 
 <template>
-  <div class="w-full text-center mt-4 select-none">
+  <div class="mt-3 w-full select-none text-center">
     <h1
-      class="text-xl sm:text-2xl font-bold text-foreground leading-snug line-clamp-2 px-2"
+      class="line-clamp-2 px-2 text-xl font-bold leading-snug text-foreground sm:text-2xl"
       :title="title || 'Loading audio...'"
     >
       {{ title || "Loading audio..." }}
     </h1>
 
     <div
-      class="flex items-center justify-center gap-2 mt-2 text-sm text-muted-foreground"
+      class="mt-1.5 flex items-center justify-center gap-2 text-sm text-muted-foreground"
     >
       <img
         v-if="avatarUrl"
@@ -29,7 +29,7 @@ defineProps<{
         :alt="author"
         class="h-5 w-5 rounded-full object-cover ring-1 ring-border"
       />
-      <span class="font-medium hover:text-foreground transition-colors">
+      <span class="font-medium transition-colors hover:text-foreground">
         {{ author || "Artist" }}
       </span>
       <CheckCircle2
@@ -37,31 +37,5 @@ defineProps<{
         class="h-3.5 w-3.5 text-muted-foreground fill-muted-foreground/30"
       />
     </div>
-
-    <!-- Action Buttons (Like / Share / Save) in English -->
-    <div class="flex items-center justify-center gap-2 mt-4">
-      <button
-        type="button"
-        class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-muted/60 hover:bg-muted text-xs font-medium text-foreground transition-colors cursor-pointer"
-      >
-        <ThumbsUp class="h-3.5 w-3.5" />
-        <span>Like</span>
-      </button>
-      <button
-        type="button"
-        class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-muted/60 hover:bg-muted text-xs font-medium text-foreground transition-colors cursor-pointer"
-      >
-        <Share2 class="h-3.5 w-3.5" />
-        <span>Share</span>
-      </button>
-      <button
-        type="button"
-        class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-muted/60 hover:bg-muted text-xs font-medium text-foreground transition-colors cursor-pointer"
-      >
-        <Bookmark class="h-3.5 w-3.5" />
-        <span>Save</span>
-      </button>
-    </div>
   </div>
 </template>
-
