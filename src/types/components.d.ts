@@ -14,6 +14,7 @@ declare module 'vue' {
     AppHeader: typeof import('./../components/layout/AppHeader.vue')['default']
     AppLayout: typeof import('./../components/layout/AppLayout.vue')['default']
     AppSidebar: typeof import('./../components/layout/AppSidebar.vue')['default']
+    AutoplayNextOverlay: typeof import('./../components/player/AutoplayNextOverlay.vue')['default']
     Button: typeof import('./../lib/components/ui/button/Button.vue')['default']
     Card: typeof import('./../lib/components/ui/card/Card.vue')['default']
     CardAction: typeof import('./../lib/components/ui/card/CardAction.vue')['default']

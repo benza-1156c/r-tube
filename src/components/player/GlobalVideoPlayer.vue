@@ -7,6 +7,7 @@ import { usePlayerStage } from "./usePlayerStage";
 import PlayerSkin from "./PlayerSkin.vue";
 import WatchPlayerChrome from "./WatchPlayerChrome.vue";
 import MiniPlayerBar from "./MiniPlayerBar.vue";
+import AutoplayNextOverlay from "./AutoplayNextOverlay.vue";
 
 defineOptions({ name: "GlobalVideoPlayer" });
 
@@ -65,6 +66,18 @@ function expandToWatch(): void {
         <PlayerSkin>
           <WatchPlayerChrome v-if="!isMini" />
         </PlayerSkin>
+
+        <AutoplayNextOverlay
+          v-if="
+            player.status.value === 'ended' &&
+            player.autoplayCountdown.value !== null &&
+            player.upNextVideo.value
+          "
+          :next-video="player.upNextVideo.value"
+          :countdown="player.autoplayCountdown.value"
+          @play="player.playNext"
+          @cancel="player.cancelAutoplay"
+        />
       </div>
 
       <!-- Mini chrome lives below the video: the video itself is Video.js'. -->

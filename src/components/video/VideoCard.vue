@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { VideoItem } from "@/bindings";
+import { usePlayer } from "@/composables/usePlayer";
 import { CheckCircle2, Play, ListMusic } from "@lucide/vue";
 
 const props = defineProps<{
@@ -7,8 +8,10 @@ const props = defineProps<{
 }>();
 
 const router = useRouter();
+const { closePlayer } = usePlayer();
 
 function openVideo() {
+  closePlayer();
   if (props.video.playlistId) {
     router.push({
       path: `/watch/${props.video.id}`,
@@ -53,7 +56,11 @@ function openVideo() {
         class="absolute bottom-2 right-2 flex items-center gap-1 rounded-md bg-black/80 px-1.5 py-0.5 text-xs font-semibold tracking-wide text-white"
       >
         <ListMusic
-          v-if="video.playlistId || video.duration === 'Mix' || video.duration.toLowerCase().includes('video')"
+          v-if="
+            video.playlistId ||
+            video.duration === 'Mix' ||
+            video.duration.toLowerCase().includes('video')
+          "
           class="h-3 w-3"
         />
         {{ video.duration }}

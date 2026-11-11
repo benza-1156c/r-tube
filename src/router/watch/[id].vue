@@ -8,7 +8,6 @@ import {
   type WatchNextResults_Deserialize,
 } from "@/bindings";
 import {
-  ArrowLeft,
   ThumbsUp,
   Share2,
   Bookmark,
@@ -56,6 +55,9 @@ async function loadWatchData(id: string) {
     const res = await commands.getWatchNext(id);
     if (res.status === "ok") {
       watchNext.value = res.data;
+      if (res.data.relatedVideos && res.data.relatedVideos.length > 0) {
+        player.setUpNextVideo(res.data.relatedVideos[0]);
+      }
     }
   } catch (err) {
     console.warn("Failed to load watch next details:", err);
@@ -107,27 +109,6 @@ function selectRelatedVideo(item: VideoItem_Deserialize) {
   <div class="flex flex-col lg:flex-row gap-6 p-6 max-w-7xl mx-auto">
     <!-- Left Column: Video Player & Metadata -->
     <div class="flex-1 flex flex-col gap-4 min-w-0">
-      <!-- Back Navigation Header -->
-      <div class="flex items-center gap-3">
-        <Button
-          variant="outline"
-          size="sm"
-          class="gap-1.5 rounded-full"
-          @click="router.push('/')"
-        >
-          <ArrowLeft class="h-4 w-4" />
-          <span>Back to Home</span>
-        </Button>
-
-        <span
-          v-if="playlistId"
-          class="text-xs px-2.5 py-1 rounded-full bg-primary/10 text-primary font-medium flex items-center gap-1"
-        >
-          <ListMusic class="h-3.5 w-3.5" />
-          Playlist Mode
-        </span>
-      </div>
-
       <!-- VIDEO PLAYER ANCHOR SLOT (GlobalVideoPlayer docks here) -->
       <div
         id="watch-player-slot"

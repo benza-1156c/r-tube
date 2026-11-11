@@ -1,4 +1,9 @@
-import { commands, type PlayerResponse_Deserialize } from "@/bindings";
+import {
+  commands,
+  type PlayerResponse_Deserialize,
+  type VideoItem_Deserialize,
+} from "@/bindings";
+import { router } from "@/router";
 import { useSettings } from "./useSettings";
 
 export interface CaptionOption {
@@ -50,6 +55,11 @@ const watchAnchor = shallowRef<HTMLElement | null>(null);
 
 const activeBlobUrls: string[] = [];
 const boundVideos = new WeakSet<HTMLVideoElement>();
+
+const upNextVideo = ref<VideoItem_Deserialize | null>(null);
+const autoplayCountdown = ref<number | null>(null);
+const isAutoplayEnabled = ref<boolean>(true);
+let autoplayTimer: ReturnType<typeof setInterval> | null = null;
 
 let isRecovering = false;
 
@@ -117,6 +127,41 @@ export function usePlayer() {
     isMiniPlayer.value = !el;
   }
 
+  function cancelAutoplay(): void {
+    if (autoplayTimer) {
+      clearInterval(autoplayTimer);
+      autoplayTimer = null;
+    }
+    autoplayCountdown.value = null;
+  }
+
+  function toggleAutoplay(): void {
+    isAutoplayEnabled.value = !isAutoplayEnabled.value;
+    if (!isAutoplayEnabled.value) {
+      cancelAutoplay();
+    }
+  }
+
+  function setUpNextVideo(video: VideoItem_Deserialize | null): void {
+    upNextVideo.value = video;
+  }
+
+  function playNext(): void {
+    cancelAutoplay();
+    const next = upNextVideo.value;
+    if (!next) return;
+
+    if (router.currentRoute.value.path.startsWith("/watch/")) {
+      void router.push(`/watch/${next.id}`);
+    } else {
+      void loadVideo(next.id, {
+        title: next.title,
+        channelName: next.channelName,
+        thumbnailUrl: next.thumbnailUrl,
+      });
+    }
+  }
+
   interface LoadOptions {
     resumeAt?: number;
     autoplay?: boolean;
@@ -129,6 +174,27 @@ export function usePlayer() {
   ): Promise<void> {
     const token = ++loadToken;
     const isStale = (): boolean => token !== loadToken;
+
+    // closePlayer();
+    cancelAutoplay();
+    upNextVideo.value = null;
+
+    // Pre-fetch the Up Next video directly from YouTube
+    void commands
+      .getWatchNext(videoId)
+      .then((res) => {
+        if (isStale()) return;
+        if (
+          res.status === "ok" &&
+          res.data.relatedVideos &&
+          res.data.relatedVideos.length > 0
+        ) {
+          upNextVideo.value = res.data.relatedVideos[0];
+        }
+      })
+      .catch((err) => {
+        console.warn("Could not pre-fetch Up Next video:", err);
+      });
 
     status.value = "loading";
     errorMessage.value = null;
@@ -311,6 +377,7 @@ export function usePlayer() {
   }
 
   function onPlay(): void {
+    cancelAutoplay();
     status.value = "playing";
   }
 
@@ -339,6 +406,21 @@ export function usePlayer() {
 
   function onEnded(): void {
     status.value = "ended";
+    if (!isAutoplayEnabled.value || !upNextVideo.value) return;
+
+    cancelAutoplay();
+    autoplayCountdown.value = 4;
+    autoplayTimer = setInterval(() => {
+      if (autoplayCountdown.value === null) {
+        cancelAutoplay();
+        return;
+      }
+      autoplayCountdown.value -= 1;
+      if (autoplayCountdown.value <= 0) {
+        cancelAutoplay();
+        playNext();
+      }
+    }, 1000);
   }
 
   function onError(e: Event | unknown): void {
@@ -384,6 +466,8 @@ export function usePlayer() {
    * and buffers.
    */
   function closePlayer(): void {
+    cancelAutoplay();
+    upNextVideo.value = null;
     loadToken++;
     isOpen.value = false;
     status.value = "idle";
@@ -419,6 +503,9 @@ export function usePlayer() {
     isPlaying,
     videoElement,
     watchAnchor,
+    upNextVideo,
+    autoplayCountdown,
+    isAutoplayEnabled,
     attachVideo,
     setWatchAnchor,
     loadVideo,
@@ -434,5 +521,9 @@ export function usePlayer() {
     closePlayer,
     minimizeToMiniPlayer,
     restoreFromMiniPlayer,
+    cancelAutoplay,
+    toggleAutoplay,
+    playNext,
+    setUpNextVideo,
   };
 }
