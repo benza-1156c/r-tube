@@ -2,25 +2,23 @@
 import { ref, computed, onMounted, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { usePlayer } from "@/composables/usePlayer";
+import { useAudioPlayer } from "@/composables/useAudioPlayer";
 import { useSettings } from "@/composables/useSettings";
-import {
-  commands,
-  type VideoItem_Deserialize,
-  type WatchNextResults_Deserialize,
-} from "@/bindings";
+import { useVideoPage, resumeFromQuery } from "@/composables/useVideoPage";
 
 import ListenArtwork from "@/components/listen/ListenArtwork.vue";
 import ListenTrackInfo from "@/components/listen/ListenTrackInfo.vue";
 import ListenControls from "@/components/listen/ListenControls.vue";
 import ListenRelated from "@/components/listen/ListenRelated.vue";
 
-import { ChevronDown, ChevronUp } from "@lucide/vue";
+import { ChevronDown, ChevronUp, AlertCircle, Clapperboard } from "@lucide/vue";
 
 defineOptions({ name: "ListenPage" });
 
 const route = useRoute();
 const router = useRouter();
 const player = usePlayer();
+const audio = useAudioPlayer();
 const { settings, updateSettings } = useSettings();
 
 const videoId = computed(
@@ -41,8 +39,13 @@ const playlistIndex = computed(() => {
   return null;
 });
 
-const watchNext = ref<WatchNextResults_Deserialize | null>(null);
-const isLoadingRelated = ref(false);
+const {
+  watchNext,
+  loading: isLoadingRelated,
+  load: loadListenData,
+  selectRelated,
+} = useVideoPage(videoId, playlistId, playlistIndex);
+
 const isDescriptionExpanded = ref(false);
 
 const duration = computed(() => player.currentVideo.value?.duration || 0);
@@ -57,88 +60,36 @@ const currentThumbnail = computed(() => {
   );
 });
 
-function applyAudioOnlyOptimization() {
-  const el = player.videoElement.value as any;
-  if (!el) return;
-  const renditions = el.videoRenditions;
-  if (renditions && renditions.length > 0) {
-    // Select lowest video rendition to minimize bandwidth and memory footprint
-    renditions.selectedIndex = 0;
-  }
-}
-
-async function loadListenData(id: string) {
+function startPlayback(id: string): void {
   if (!id) return;
 
-  const playerAlreadyHasVideo =
-    player.isOpen.value &&
+  // Re-entering the same track (for example after a re-render) must not restart
+  // it; anything else replaces the current audio source.
+  const alreadyLoaded =
+    player.activeEngine.value === "audio" &&
     player.currentVideo.value?.id === id &&
-    player.status.value !== "error" &&
-    (player.status.value === "loading" || Boolean(player.currentSrc.value));
-
-  if (!playerAlreadyHasVideo) {
-    player.loadVideo(id);
+    player.status.value !== "error";
+  if (!alreadyLoaded) {
+    void audio.loadAudio(id, {
+      resumeAt: resumeFromQuery(route.query),
+      autoplay: true,
+    });
   }
 
-  // Fetch Watch Next results (related videos & playlist queue)
-  isLoadingRelated.value = true;
-  try {
-    const res = await commands.getWatchNext(
-      id,
-      playlistId.value,
-      playlistIndex.value,
-    );
-    if (res.status === "ok") {
-      watchNext.value = res.data;
-
-      // If in playlist / mix, queue up the next song
-      if (res.data.playlistItems && res.data.playlistItems.length > 0) {
-        const curIdx = res.data.playlistItems.findIndex(
-          (p) => p.videoId === id || p.isSelected,
-        );
-        const nextItem =
-          curIdx >= 0 && curIdx + 1 < res.data.playlistItems.length
-            ? res.data.playlistItems[curIdx + 1]
-            : null;
-        if (nextItem) {
-          player.setUpNextVideo({
-            id: nextItem.videoId,
-            title: nextItem.title,
-            thumbnailUrl: nextItem.thumbnailUrl,
-            duration: "",
-            channelName: nextItem.author,
-            channelAvatarUrl: "",
-            isVerified: false,
-            isLive: false,
-            viewCount: "",
-            publishedAt: "",
-            playlistId: playlistId.value || undefined,
-          });
-        }
-      } else if (res.data.relatedVideos && res.data.relatedVideos.length > 0) {
-        player.setUpNextVideo(res.data.relatedVideos[0]);
-      }
-    }
-  } catch (err) {
-    console.warn("Failed to load listen details:", err);
-  } finally {
-    isLoadingRelated.value = false;
-    applyAudioOnlyOptimization();
-  }
+  // The queue and the related list are per-route, not per-engine.
+  void loadListenData();
 }
 
 onMounted(() => {
-  // If settings indicate normal mode, redirect to watch page
   if (settings.value.playbackMode === "normal" && videoId.value) {
-    router.replace({
+    void router.replace({
       path: `/watch/${videoId.value}`,
       query: route.query,
     });
     return;
   }
-
   if (videoId.value) {
-    loadListenData(videoId.value);
+    startPlayback(videoId.value);
   }
 });
 
@@ -147,34 +98,19 @@ watch(
   [() => videoId.value, () => route.query.list, () => route.query.index],
   ([newId]) => {
     if (newId) {
-      loadListenData(newId);
+      startPlayback(newId);
     }
   },
 );
 
-// If playbackMode changes to normal, redirect to watch
-watch(
-  () => settings.value.playbackMode,
-  (mode) => {
-    if (mode === "normal" && videoId.value) {
-      router.replace({
-        path: `/watch/${videoId.value}`,
-        query: route.query,
-      });
-    }
-  },
-);
-
-function handleSeek(targetTime: number) {
-  if (player.videoElement.value) {
-    player.videoElement.value.currentTime = targetTime;
-  }
+function handleSeek(targetTime: number): void {
+  player.seek(targetTime);
 }
 
-function handlePrevious() {
-  const el = player.videoElement.value;
+function handlePrevious(): void {
+  const el = player.activeMedia.value;
   if (el && el.currentTime > 3) {
-    el.currentTime = 0;
+    player.seek(0);
     return;
   }
 
@@ -185,7 +121,7 @@ function handlePrevious() {
     );
     if (curIdx > 0) {
       const prevItem = watchNext.value.playlistItems[curIdx - 1];
-      router.push({
+      void router.push({
         path: `/listen/${prevItem.videoId}`,
         query: {
           list: playlistId.value,
@@ -196,20 +132,17 @@ function handlePrevious() {
     }
   }
 
-  if (el) {
-    el.currentTime = 0;
-  }
+  player.seek(0);
 }
 
-function handleNext() {
-  // Go to next track in playlist if available
+function handleNext(): void {
   if (watchNext.value?.playlistItems && playlistId.value) {
     const curIdx = watchNext.value.playlistItems.findIndex(
       (p) => p.videoId === videoId.value || p.isSelected,
     );
     if (curIdx >= 0 && curIdx + 1 < watchNext.value.playlistItems.length) {
       const nextItem = watchNext.value.playlistItems[curIdx + 1];
-      router.push({
+      void router.push({
         path: `/listen/${nextItem.videoId}`,
         query: {
           list: playlistId.value,
@@ -223,33 +156,21 @@ function handleNext() {
   player.playNext();
 }
 
-function handleVolumeChange(val: number) {
-  if (player.videoElement.value) {
-    player.videoElement.value.volume = val;
-  }
-  void updateSettings({ volume: val });
+function handleVolumeChange(val: number): void {
+  player.setVolume(val);
 }
 
-function toggleMute() {
-  const el = player.videoElement.value;
-  if (!el) return;
-  if (el.muted || el.volume === 0) {
-    el.muted = false;
-    el.volume = settings.value.volume || 0.75;
-  } else {
-    el.muted = true;
-  }
+function toggleMute(): void {
+  player.toggleMute();
 }
 
-function selectRelated(item: VideoItem_Deserialize) {
-  if (item.playlistId) {
-    router.push({
-      path: `/listen/${item.id}`,
-      query: { list: item.playlistId },
-    });
-  } else {
-    router.push(`/listen/${item.id}`);
-  }
+/** A live stream or a broken audio URL still plays in video mode. */
+function switchToVideo(): void {
+  void updateSettings({ playbackMode: "normal" });
+  void router.replace({
+    path: `/watch/${videoId.value}`,
+    query: route.query,
+  });
 }
 </script>
 
@@ -298,7 +219,7 @@ function selectRelated(item: VideoItem_Deserialize) {
             player.status.value === 'buffering'
           "
           :volume="settings.volume ?? 1"
-          :is-muted="Boolean(player.videoElement.value?.muted)"
+          :is-muted="player.isMuted.value"
           @seek="handleSeek"
           @toggle-play="player.togglePlay"
           @previous="handlePrevious"
@@ -306,6 +227,32 @@ function selectRelated(item: VideoItem_Deserialize) {
           @volume-change="handleVolumeChange"
           @toggle-mute="toggleMute"
         />
+
+        <!-- Audio-only failure: live streams and unplayable releases still have video. -->
+        <div
+          v-if="player.status.value === 'error'"
+          class="w-full rounded-2xl border border-destructive/30 bg-destructive/5 p-4 mt-6 text-sm"
+        >
+          <div class="flex items-start gap-3">
+            <AlertCircle class="h-4 w-4 mt-0.5 shrink-0 text-destructive" />
+            <div class="flex-1 min-w-0">
+              <p class="font-semibold text-foreground">
+                Audio-only playback is unavailable
+              </p>
+              <p class="text-xs text-muted-foreground mt-1 wrap-break-word">
+                {{ player.errorMessage.value }}
+              </p>
+              <button
+                type="button"
+                class="mt-3 inline-flex items-center gap-1.5 rounded-full bg-foreground px-3 py-1.5 text-xs font-medium text-background cursor-pointer"
+                @click="switchToVideo"
+              >
+                <Clapperboard class="h-3.5 w-3.5" />
+                Watch video instead
+              </button>
+            </div>
+          </div>
+        </div>
 
         <!-- Description Box (English Labels) -->
         <div

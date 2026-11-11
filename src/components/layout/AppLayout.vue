@@ -4,6 +4,7 @@ import { computed, onMounted, onBeforeUnmount } from "vue";
 import AppTitleBar from "@/components/layout/AppTitleBar.vue";
 import PlaybackModeOsd from "@/components/layout/PlaybackModeOsd.vue";
 import GlobalVideoPlayer from "@/components/player/GlobalVideoPlayer.vue";
+import GlobalAudioPlayer from "@/components/audio/GlobalAudioPlayer.vue";
 import { useMiniPlayerDraggable } from "@/composables/useMiniPlayerDraggable";
 
 const route = useRoute();
@@ -40,7 +41,7 @@ onBeforeUnmount(() => {
 
         <main class="flex-1 overflow-y-auto">
           <router-view v-slot="{ Component, route: currentRoute }">
-            <keep-alive exclude="WatchPage">
+            <keep-alive exclude="WatchPage,ListenPage">
               <component :is="Component" :key="currentRoute.fullPath" />
             </keep-alive>
           </router-view>
@@ -55,6 +56,10 @@ onBeforeUnmount(() => {
       >
         <GlobalVideoPlayer />
       </div>
+
+      <!-- Audio-only engine: lives outside the router view so a track keeps
+           playing while the user browses elsewhere. -->
+      <GlobalAudioPlayer />
 
       <!-- Transient confirmation when the playback mode is switched. -->
       <PlaybackModeOsd />

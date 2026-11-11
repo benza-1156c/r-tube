@@ -6,11 +6,14 @@ import { AudioLines, Clapperboard } from "@lucide/vue";
 import WindowControls from "@/components/layout/WindowControls.vue";
 import { useSettings, type PlaybackMode } from "@/composables/useSettings";
 import { usePlaybackModeNotice } from "@/composables/usePlaybackModeNotice";
+import { usePlayer } from "@/composables/usePlayer";
+import { withResumeAt } from "@/composables/useVideoPage";
 
 const router = useRouter();
 const route = useRoute();
 const { settings, updateSettings } = useSettings();
 const { notifyPlaybackMode } = usePlaybackModeNotice();
+const player = usePlayer();
 
 const playbackMode = computed<PlaybackMode>(() => settings.value.playbackMode);
 
@@ -45,18 +48,22 @@ function setPlaybackMode(mode: PlaybackMode): void {
   const currentId = (route.params as Record<string, any>)?.id as
     | string
     | undefined;
-  if (currentId) {
-    if (mode === "audio-only" && currentPath.startsWith("/watch/")) {
-      router.push({
-        path: `/listen/${currentId}`,
-        query: route.query,
-      });
-    } else if (mode === "normal" && currentPath.startsWith("/listen/")) {
-      router.push({
-        path: `/watch/${currentId}`,
-        query: route.query,
-      });
-    }
+  if (!currentId) return;
+
+  // Hand the other engine the exact position this one is at, so the switch
+  // continues from the same second.
+  const query = withResumeAt(route.query, player.currentTime.value || 0);
+
+  if (mode === "audio-only" && currentPath.startsWith("/watch/")) {
+    void router.push({
+      path: `/listen/${currentId}`,
+      query,
+    });
+  } else if (mode === "normal" && currentPath.startsWith("/listen/")) {
+    void router.push({
+      path: `/watch/${currentId}`,
+      query,
+    });
   }
 }
 

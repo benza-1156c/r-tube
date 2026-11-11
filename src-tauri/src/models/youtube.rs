@@ -112,6 +112,29 @@ pub struct PlayerResponse {
     pub captions: Vec<CaptionTrack>,
 }
 
+/// Metadata + a proxied URL for the best audio-only stream of a video.
+///
+/// The URL is the local proxy endpoint (`/audio?url=…`), never the raw CDN URL:
+/// the proxy is what adds `Range` support and re-mints expired URLs.
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct AudioStreamInfo {
+    pub itag: u32,
+    pub url: String,
+    pub mime_type: String,
+    pub bitrate: f64,
+    pub content_length: Option<f64>,
+    pub duration_ms: Option<f64>,
+    pub language: Option<String>,
+    pub title: String,
+    pub author: String,
+    pub thumbnail_url: String,
+    pub length_seconds: String,
+    pub description: String,
+    pub view_count: String,
+    pub is_live: bool,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct PlaylistPanelItem {

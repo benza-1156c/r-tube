@@ -22,6 +22,8 @@ const stageRef = ref<HTMLElement | null>(null);
 
 const isListenPage = computed(() => route.path.startsWith("/listen"));
 const isAudioOnly = computed(() => settings.value.playbackMode !== "normal");
+/** Audio mode owns playback: the whole video engine is unmounted to free RAM. */
+const isAudioMode = computed(() => player.activeEngine.value === "audio");
 
 /**
  * Mini mode is "the player is not docked in a page": either the user
@@ -62,7 +64,7 @@ function expandToWatch(): void {
   -->
   <div ref="stageRef" class="rt-player-stage">
     <div
-      v-show="player.isOpen.value"
+      v-show="player.isOpen.value && !isAudioMode"
       id="global-player-root"
       ref="rootRef"
       class="rt-player select-none bg-black"
@@ -81,7 +83,9 @@ function expandToWatch(): void {
             isListenPage || (isMini && isAudioOnly),
         }"
       >
-        <PlayerSkin>
+        <PlayerSkin
+          v-if="!isAudioMode && !player.videoReleased.value && player.isOpen.value"
+        >
           <WatchPlayerChrome v-if="!isMini" />
         </PlayerSkin>
 
@@ -100,7 +104,7 @@ function expandToWatch(): void {
 
       <!-- Mini chrome lives below the video: the video itself is Video.js'. -->
       <MiniPlayerBar
-        v-if="isMini && !isListenPage"
+        v-if="isMini && !isListenPage && !isAudioMode"
         @expand="expandToWatch"
         @close="player.closePlayer"
       />

@@ -4,15 +4,21 @@
 //! each (one per HLS segment), so the connection survives across requests
 //! until the peer closes it or goes idle.
 
+use std::collections::HashMap;
+
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
+use super::audio;
 use super::hls;
 use super::{IDLE_TIMEOUT, MAX_HEAD_BYTES};
 
 struct RequestHead {
     method: String,
     target: String,
+    /// Lower-cased header name -> trimmed value. The audio endpoint needs
+    /// `Range` (and a few cache validators) forwarded verbatim.
+    headers: HashMap<String, String>,
     close_after: bool,
 }
 
@@ -74,16 +80,23 @@ fn parse_head(head: &str) -> Option<RequestHead> {
     let method = parts.next()?.to_string();
     let target = parts.next()?.to_string();
 
+    let mut headers = HashMap::new();
+    for line in lines {
+        if let Some((name, value)) = line.split_once(':') {
+            headers.insert(name.trim().to_ascii_lowercase(), value.trim().to_string());
+        }
+    }
+
     // Only `Connection` matters to the framing here.
-    let close_after = lines
-        .filter_map(|line| line.split_once(':'))
-        .find(|(name, _)| name.trim().eq_ignore_ascii_case("connection"))
-        .map(|(_, value)| value.trim().eq_ignore_ascii_case("close"))
+    let close_after = headers
+        .get("connection")
+        .map(|value| value.eq_ignore_ascii_case("close"))
         .unwrap_or(false);
 
     Some(RequestHead {
         method,
         target,
+        headers,
         close_after,
     })
 }
@@ -118,6 +131,15 @@ Content-Length: 0\r\n\r\n";
         return hls::serve(stream, client, &params, &req.method).await;
     }
 
+    if req.target.starts_with("/audio?") {
+        let query = req.target.split_once('?').map(|(_, q)| q).unwrap_or("");
+        let params: std::collections::HashMap<String, String> =
+            url::form_urlencoded::parse(query.as_bytes())
+                .into_owned()
+                .collect();
+        return audio::serve(stream, client, &params, &req.method, &req.headers).await;
+    }
+
     write_text(stream, 404, "not found").await
 }
 
@@ -132,6 +154,7 @@ pub(super) async fn write_text(
         "HTTP/1.1 {status} {}\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
         match status {
             400 => "Bad Request",
+            403 => "Forbidden",
             404 => "Not Found",
             405 => "Method Not Allowed",
             502 => "Bad Gateway",
@@ -155,5 +178,16 @@ mod tests {
         assert_eq!(req.method, "GET");
         assert_eq!(req.target, "/hls?url=x");
         assert!(req.close_after);
+    }
+
+    #[test]
+    fn keeps_range_headers_for_the_audio_endpoint() {
+        let head = "GET /audio?url=x HTTP/1.1\r\nHost: 127.0.0.1\r\nRange: bytes=0-1023\r\nConnection: keep-alive";
+        let req = parse_head(head).expect("head");
+        assert_eq!(
+            req.headers.get("range").map(String::as_str),
+            Some("bytes=0-1023")
+        );
+        assert!(!req.close_after);
     }
 }

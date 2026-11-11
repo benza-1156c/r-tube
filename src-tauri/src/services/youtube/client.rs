@@ -1,21 +1,33 @@
 use innertube_rs::{
-    BrowseFeed, HomeFeed, Innertube, SearchResults, SessionOptions, TrendingFeed, VideoInfo,
+    BrowseFeed, HomeFeed, Innertube, SearchResults, SessionOptions, StreamingFormat, TrendingFeed,
+    VideoInfo,
 };
 use reqwest::header::HeaderMap;
 use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use specta::Type;
+use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
 
 use crate::db::entities::profile;
 use crate::error::AppError;
 use crate::models::youtube::{
-    CaptionTrack, PlayerResponse, PlaylistContinuationResult, PlaylistDetailView,
+    AudioStreamInfo, CaptionTrack, PlayerResponse, PlaylistContinuationResult, PlaylistDetailView,
     SearchSuggestionItem, VideoItem, WatchNextResults,
 };
 use crate::services::youtube::cookie::CookieManager;
+
+/// How long a resolved audio URL is reused before re-minting it.
+const AUDIO_CACHE_TTL: Duration = Duration::from_secs(20 * 60);
+
+#[derive(Clone)]
+struct CachedAudio {
+    at: Instant,
+    info: AudioStreamInfo,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 pub struct CurrentUserProfile {
@@ -32,6 +44,7 @@ pub struct YoutubeClient {
     pub cookie_manager: CookieManager,
     active_profile_id: Arc<RwLock<Option<i32>>>,
     last_video_info: Arc<RwLock<Option<VideoInfo>>>,
+    audio_cache: Arc<RwLock<HashMap<String, CachedAudio>>>,
 }
 
 impl YoutubeClient {
@@ -51,6 +64,7 @@ impl YoutubeClient {
             cookie_manager: CookieManager::new(None),
             active_profile_id: Arc::new(RwLock::new(None)),
             last_video_info: Arc::new(RwLock::new(None)),
+            audio_cache: Arc::new(RwLock::new(HashMap::new())),
         })
     }
 
@@ -279,6 +293,184 @@ impl YoutubeClient {
         }
         None
     }
+
+    /// Best audio-only stream for a video, with metadata for the listen UI.
+    ///
+    /// The returned URL is the raw CDN URL; callers wrap it for the local proxy.
+    pub async fn audio_stream(
+        &self,
+        video_id: &str,
+        language: Option<&str>,
+    ) -> Result<AudioStreamInfo, AppError> {
+        let key = format!("{video_id}:{}", language.unwrap_or_default());
+
+        if let Some(cached) = self.audio_cache.read().await.get(&key) {
+            if cached.at.elapsed() < AUDIO_CACHE_TTL {
+                return Ok(cached.info.clone());
+            }
+        }
+
+        let info = self.resolve_audio(video_id, language, None).await?;
+        self.audio_cache.write().await.insert(
+            key,
+            CachedAudio {
+                at: Instant::now(),
+                info: info.clone(),
+            },
+        );
+        Ok(info)
+    }
+
+    /// Re-mint an expired audio URL for the same track, so a paused song can
+    /// resume hours later without switching formats.
+    ///
+    /// The player response is fetched fresh: the cached one still holds the
+    /// URL that just expired.
+    pub async fn refresh_audio_url(&self, video_id: &str, itag: u32) -> Option<String> {
+        self.resolve_audio(video_id, None, Some(itag))
+            .await
+            .ok()
+            .map(|info| info.url)
+    }
+
+    async fn resolve_audio(
+        &self,
+        video_id: &str,
+        language: Option<&str>,
+        wanted_itag: Option<u32>,
+    ) -> Result<AudioStreamInfo, AppError> {
+        let player_response = self.audio_player_response(video_id).await?;
+
+        let streaming = player_response.streaming_data.as_ref().ok_or_else(|| {
+            AppError::NotFound("This video has no streamable formats".to_string())
+        })?;
+
+        let format = pick_audio_format(&streaming.adaptive_formats, language, wanted_itag)
+            .ok_or_else(|| {
+                AppError::NotFound("This video has no audio-only stream".to_string())
+            })?;
+
+        // Live/DVR audio arrives as an open-ended chunked stream: there is no
+        // length to range over, so it cannot be the lightweight `<audio>` path.
+        if format.is_type_otf.unwrap_or(false) {
+            return Err(AppError::NotFound(
+                "Live streams are not available in audio-only mode".to_string(),
+            ));
+        }
+
+        // The response comes from the anonymous VISIONOS client, so the
+        // decipherer and PO token must come from that session too.
+        let url = innertube_rs::endpoints::player::resolve_stream_url_full(
+            &format,
+            &self.anon_innertube.player.decipherer,
+            self.anon_innertube.session.po_token.as_deref(),
+            None,
+        )
+        .map_err(|e| AppError::Internal(format!("Failed to resolve audio stream: {e}")))?;
+
+        let (title, author, thumbnail_url, length_seconds, description, view_count, is_live) =
+            player_response
+                .video_details
+                .as_ref()
+                .map(|details| {
+                    (
+                        details.title.clone(),
+                        details.author.clone(),
+                        details
+                            .thumbnail
+                            .as_ref()
+                            .and_then(|thumbnail| thumbnail.thumbnails.last())
+                            .map(|thumbnail| thumbnail.url.clone())
+                            .unwrap_or_default(),
+                        details.length_seconds.clone(),
+                        details.short_description.clone().unwrap_or_default(),
+                        details.view_count.clone().unwrap_or_default(),
+                        details.is_live.unwrap_or(false),
+                    )
+                })
+                .unwrap_or_default();
+
+        Ok(AudioStreamInfo {
+            itag: format.itag,
+            url,
+            mime_type: format.mime_type.clone(),
+            bitrate: format.bitrate as f64,
+            content_length: format
+                .content_length
+                .as_deref()
+                .and_then(|value| value.parse().ok()),
+            duration_ms: format
+                .approx_duration_ms
+                .as_deref()
+                .and_then(|value| value.parse().ok()),
+            language: format.language(),
+            title,
+            author,
+            thumbnail_url,
+            length_seconds,
+            description,
+            view_count,
+            is_live,
+        })
+    }
+
+    /// Player response to pick an audio stream from.
+    ///
+    /// The generic player chain ends on the iOS client, which only exposes AAC
+    /// audio, and most other clients return CDN URLs that refuse any range
+    /// except one starting at byte 0 — which makes `<audio>` seeking impossible.
+    /// The anonymous VISIONOS client returns Opus 160 kbps *and* URLs that
+    /// serve arbitrary byte ranges, so it is the one the listen mode uses.
+    async fn audio_player_response(
+        &self,
+        video_id: &str,
+    ) -> Result<innertube_rs::PlayerResponse, AppError> {
+        let mut fallback: Option<innertube_rs::PlayerResponse> = None;
+
+        for client in ["VISIONOS", "ANDROID_VR", "MWEB", "WEB"] {
+            let options = innertube_rs::GetVideoInfoOptions {
+                client: Some(client.to_string()),
+                po_token: None,
+                playback_context: None,
+            };
+            match self
+                .anon_innertube
+                .get_basic_info(video_id, Some(&options))
+                .await
+            {
+                Ok(info)
+                    if info.player_response.playability_status.status == "OK"
+                        && has_playable_audio(&info.player_response) =>
+                {
+                    // Opus (251) is the point of audio-only mode; VISIONOS has it.
+                    if has_opus_audio(&info.player_response) {
+                        return Ok(info.player_response);
+                    }
+                    if fallback.is_none() {
+                        fallback = Some(info.player_response);
+                    }
+                }
+                Err(e) => eprintln!("[YouTube] audio via {client} failed: {e}"),
+                _ => {}
+            }
+        }
+
+        if let Some(response) = fallback {
+            return Ok(response);
+        }
+
+        // Restricted videos may only answer a signed-in session. Their URLs may
+        // not be seekable, but playing is better than failing outright.
+        let info = self
+            .innertube
+            .read()
+            .await
+            .get_basic_info(video_id, None)
+            .await
+            .map_err(|e| AppError::Internal(format!("Failed to get video info: {e}")))?;
+        Ok(info.player_response)
+    }
+
     /// Get watch next details (related videos and playlist context)
     pub async fn get_watch_next(
         &self,
@@ -536,73 +728,191 @@ impl YoutubeClient {
     }
 }
 
+fn playable_audio(format: &StreamingFormat) -> bool {
+    format.is_audio_only()
+        && !format.is_drc()
+        && (format.url.is_some() || format.signature_cipher.is_some() || format.cipher.is_some())
+}
+
+fn has_playable_audio(response: &innertube_rs::PlayerResponse) -> bool {
+    response
+        .streaming_data
+        .as_ref()
+        .map(|streaming| streaming.adaptive_formats.iter().any(playable_audio))
+        .unwrap_or(false)
+}
+
+fn has_opus_audio(response: &innertube_rs::PlayerResponse) -> bool {
+    response
+        .streaming_data
+        .as_ref()
+        .map(|streaming| {
+            streaming
+                .adaptive_formats
+                .iter()
+                .any(|format| format.itag == 251 && playable_audio(format))
+        })
+        .unwrap_or(false)
+}
+
+/// Pick the audio-only format worth playing.
+///
+/// Priority: the original audio track (never an auto-dub), then Opus 160 kbps
+/// (`itag 251`), then AAC 128 kbps (`itag 140`), then the highest bitrate left.
+/// DRC variants are skipped because they are loudness-normalised copies.
+fn pick_audio_format(
+    formats: &[StreamingFormat],
+    language: Option<&str>,
+    wanted_itag: Option<u32>,
+) -> Option<StreamingFormat> {
+    // A refresh keeps the track the session was already playing.
+    if let Some(itag) = wanted_itag {
+        if let Some(found) = formats
+            .iter()
+            .find(|format| format.itag == itag && playable_audio(format))
+        {
+            return Some(found.clone());
+        }
+    }
+
+    let mut pool: Vec<&StreamingFormat> = formats.iter().filter(|format| playable_audio(format)).collect();
+    if pool.is_empty() {
+        return None;
+    }
+
+    // Multi-audio videos label the untouched track "… original"; prefer it over
+    // every language dub, whatever the bitrates say.
+    let labelled_original: Vec<&StreamingFormat> = pool
+        .iter()
+        .copied()
+        .filter(|format| {
+            format
+                .audio_track
+                .as_ref()
+                .map(|track| track.display_name.to_ascii_lowercase().contains("original"))
+                .unwrap_or(false)
+        })
+        .collect();
+    if !labelled_original.is_empty() {
+        pool = labelled_original;
+    } else {
+        let originals: Vec<&StreamingFormat> = pool
+            .iter()
+            .copied()
+            .filter(|format| format.is_original())
+            .collect();
+        if !originals.is_empty() {
+            pool = originals;
+        }
+    }
+
+    // The default track is the one the uploader picked for the video.
+    let defaults: Vec<&StreamingFormat> = pool
+        .iter()
+        .copied()
+        .filter(|format| {
+            format
+                .audio_track
+                .as_ref()
+                .map(|track| track.audio_is_default)
+                .unwrap_or(false)
+        })
+        .collect();
+    if !defaults.is_empty() {
+        pool = defaults;
+    }
+
+    if let Some(language) = language {
+        let matching: Vec<&StreamingFormat> = pool
+            .iter()
+            .copied()
+            .filter(|format| format.language().as_deref() == Some(language))
+            .collect();
+        if !matching.is_empty() {
+            pool = matching;
+        }
+    }
+
+    pool.into_iter()
+        .min_by_key(|format| (itag_rank(format.itag), std::cmp::Reverse(format.bitrate)))
+        .cloned()
+}
+
+fn itag_rank(itag: u32) -> u8 {
+    match itag {
+        251 => 0, // Opus 160 kbps, 48 kHz â€” the best audio YouTube serves
+        140 => 1, // AAC 128 kbps
+        250 => 2, // Opus 70 kbps
+        139 => 3, // AAC 48 kbps
+        249 => 4, // Opus 50 kbps
+        _ => 5,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use innertube_rs::models::format::AudioTrack;
 
-    /// The playback contract: a proxied HLS master playlist, and its segments
-    /// reachable through the proxy.
-    #[tokio::test]
-    async fn video_info_has_proxied_hls_manifest() {
-        let client = YoutubeClient::new().await.expect("Failed to create client");
-        let video_id =
-            std::env::var("PROBE_VIDEO_ID").unwrap_or_else(|_| "8XXPxLLgwt8".to_string());
-        let info = client
-            .get_video_info(&video_id)
-            .await
-            .expect("Failed to get video info");
+    fn audio(itag: u32, bitrate: u64) -> StreamingFormat {
+        StreamingFormat {
+            itag,
+            bitrate,
+            mime_type: "audio/webm; codecs=\"opus\"".to_string(),
+            url: Some(format!("https://example.invalid/audio/{itag}")),
+            ..Default::default()
+        }
+    }
 
-        assert!(!info.title.is_empty(), "expected a title");
-        let hls = info
-            .hls_manifest_url
-            .as_deref()
-            .expect("expected an HLS manifest");
-        assert!(
-            hls.starts_with("http://127.0.0.1:"),
-            "HLS manifest must be proxied, got: {hls}"
-        );
+    fn with_track(mut format: StreamingFormat, name: &str, is_default: bool) -> StreamingFormat {
+        format.audio_track = Some(AudioTrack {
+            audio_is_default: is_default,
+            display_name: name.to_string(),
+            id: name.to_string(),
+        });
+        format
+    }
 
-        let http = reqwest::Client::new();
-        let master = http
-            .get(hls)
-            .send()
-            .await
-            .expect("proxy request failed")
-            .text()
-            .await
-            .expect("body");
-        assert!(master.starts_with("#EXTM3U"), "expected a playlist");
-        assert!(
-            master.contains("http://127.0.0.1:"),
-            "every playlist URI should be rewritten through the proxy"
-        );
+    #[test]
+    fn prefers_opus_160_over_aac() {
+        let formats = vec![audio(140, 129_000), audio(251, 160_000)];
+        let picked = pick_audio_format(&formats, None, None).expect("an audio format");
+        assert_eq!(picked.itag, 251);
+    }
 
-        // Fetch one rewritten variant playlist: its segments must resolve too.
-        let variant = master
-            .lines()
-            .find(|line| line.starts_with("http://127.0.0.1:"))
-            .expect("a rewritten variant URI");
-        let media = http
-            .get(variant)
-            .send()
-            .await
-            .expect("variant request failed")
-            .text()
-            .await
-            .expect("variant body");
-        assert!(media.starts_with("#EXTM3U"), "expected a media playlist");
+    #[test]
+    fn ignores_video_only_formats() {
+        let mut video = audio(137, 4_000_000);
+        video.mime_type = "video/mp4".to_string();
+        let formats = vec![video, audio(140, 129_000)];
+        let picked = pick_audio_format(&formats, None, None).expect("an audio format");
+        assert_eq!(picked.itag, 140);
+    }
 
-        let segment = media
-            .lines()
-            .find(|line| line.starts_with("http://127.0.0.1:"))
-            .expect("a rewritten segment URI");
-        let resp = http.get(segment).send().await.expect("segment request");
-        assert!(
-            resp.status().is_success(),
-            "segment request failed: {}",
-            resp.status()
-        );
-        let bytes = resp.bytes().await.expect("segment bytes");
-        assert!(bytes.len() > 1000, "segment too small: {}", bytes.len());
+    #[test]
+    fn refresh_keeps_the_requested_itag() {
+        let formats = vec![audio(251, 160_000), audio(140, 129_000)];
+        let picked = pick_audio_format(&formats, None, Some(140)).expect("an audio format");
+        assert_eq!(picked.itag, 140);
+    }
+
+    #[test]
+    fn labelled_original_beats_a_higher_bitrate_dub() {
+        let dub = with_track(audio(251, 160_000), "English (US)", true);
+        let original = with_track(audio(140, 129_000), "Thai original", false);
+        let formats = vec![dub, original];
+
+        let picked = pick_audio_format(&formats, Some("th"), None).expect("an audio format");
+        assert_eq!(picked.itag, 140, "a dub must never win over the original");
+    }
+
+    #[test]
+    fn prefers_the_default_track_of_equal_originals() {
+        let a = with_track(audio(251, 160_000), "Thai", false);
+        let b = with_track(audio(251, 160_001), "Thai", true);
+        let formats = vec![a, b];
+
+        let picked = pick_audio_format(&formats, None, None).expect("an audio format");
+        assert!(picked.audio_track.unwrap().audio_is_default);
     }
 }

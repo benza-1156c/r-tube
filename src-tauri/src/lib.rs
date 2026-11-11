@@ -53,6 +53,12 @@ pub fn run() {
                     Box::pin(async move { yt.hls_manifest_url(&video_id).await })
                 });
 
+                let audio_yt = std::sync::Arc::clone(&yt);
+                utils::proxy::set_audio_refresher(move |video_id, itag| {
+                    let yt = std::sync::Arc::clone(&audio_yt);
+                    Box::pin(async move { yt.refresh_audio_url(&video_id, itag).await })
+                });
+
                 let _ = yt.init_from_active_profile(&db).await;
 
                 let initial_settings = models::settings::AppSettings::load_from_store(&app_handle);

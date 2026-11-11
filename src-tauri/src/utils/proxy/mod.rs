@@ -1,3 +1,4 @@
+mod audio;
 mod connection;
 mod hls;
 
@@ -24,6 +25,22 @@ pub type RefreshFuture = Pin<Box<dyn Future<Output = Option<String>> + Send>>;
 type ManifestRefresher = dyn Fn(String) -> RefreshFuture + Send + Sync + 'static;
 
 static MANIFEST_REFRESHER: OnceLock<Arc<ManifestRefresher>> = OnceLock::new();
+
+type AudioRefresher = dyn Fn(String, u32) -> RefreshFuture + Send + Sync + 'static;
+
+static AUDIO_REFRESHER: OnceLock<Arc<AudioRefresher>> = OnceLock::new();
+
+/// Register the callback that re-mints an expired audio stream URL.
+///
+/// Adaptive audio URLs expire after a few hours. When the CDN rejects one, the
+/// proxy asks this callback for a fresh URL for the same `(video, itag)` pair
+/// and replays the pending request against it.
+pub fn set_audio_refresher<F>(refresher: F)
+where
+    F: Fn(String, u32) -> RefreshFuture + Send + Sync + 'static,
+{
+    let _ = AUDIO_REFRESHER.set(Arc::new(refresher));
+}
 
 /// Register the callback that re-mints an HLS master playlist URL.
 ///
@@ -109,6 +126,31 @@ pub async fn start_proxy_server() -> Result<u16, String> {
     Ok(port)
 }
 
+/// Hosts the proxy is allowed to fetch.
+///
+/// The endpoint listens on loopback and takes a full URL, so without this any
+/// local process could use it as an open relay to reach arbitrary hosts.
+pub(super) fn is_allowed_stream_host(raw: &str) -> bool {
+    let Ok(parsed) = url::Url::parse(raw) else {
+        return false;
+    };
+    if parsed.scheme() != "https" {
+        return false;
+    }
+    let Some(host) = parsed.host_str() else {
+        return false;
+    };
+    [
+        "googlevideo.com",
+        "youtube.com",
+        "ytimg.com",
+        "googleusercontent.com",
+        "gvt1.com",
+    ]
+    .iter()
+    .any(|suffix| host == *suffix || host.ends_with(&format!(".{suffix}")))
+}
+
 /// Wrap a raw HLS URL so the player fetches it through this proxy.
 pub fn wrap_hls_url(raw_url: &str, video_id: &str) -> String {
     let port = get_proxy_port();
@@ -118,4 +160,38 @@ pub fn wrap_hls_url(raw_url: &str, video_id: &str) -> String {
     let encoded: String = url::form_urlencoded::byte_serialize(raw_url.as_bytes()).collect();
     let vid: String = url::form_urlencoded::byte_serialize(video_id.as_bytes()).collect();
     format!("http://127.0.0.1:{port}/hls?url={encoded}&vid={vid}")
+}
+
+/// Wrap a direct adaptive-audio URL so the WebView fetches it through this proxy.
+///
+/// `content_length` travels with the URL because the proxy has to turn the
+/// browser's open-ended `Range: bytes=0-` into bounded upstream reads, which
+/// needs the total size.
+pub fn wrap_audio_url(raw_url: &str, video_id: &str, itag: u32, content_length: u64) -> String {
+    let port = get_proxy_port();
+    if port == 0 || raw_url.starts_with("http://127.0.0.1:") {
+        return raw_url.to_string();
+    }
+    let encoded: String = url::form_urlencoded::byte_serialize(raw_url.as_bytes()).collect();
+    let vid: String = url::form_urlencoded::byte_serialize(video_id.as_bytes()).collect();
+    format!("http://127.0.0.1:{port}/audio?url={encoded}&vid={vid}&itag={itag}&clen={content_length}")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_allowed_stream_host;
+
+    #[test]
+    fn allows_only_youtube_media_hosts() {
+        assert!(is_allowed_stream_host(
+            "https://rr4---sn-abcd.googlevideo.com/videoplayback?x=1"
+        ));
+        assert!(is_allowed_stream_host(
+            "https://manifest.googlevideo.com/api/manifest/hls_playlist/x"
+        ));
+        assert!(is_allowed_stream_host("https://www.youtube.com/watch?v=1"));
+        assert!(!is_allowed_stream_host("http://127.0.0.1:8080/steal"));
+        assert!(!is_allowed_stream_host("https://evil.example.com/x"));
+        assert!(!is_allowed_stream_host("https://notgooglevideo.com/x"));
+    }
 }

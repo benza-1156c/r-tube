@@ -1,3 +1,4 @@
+import { computed, nextTick, shallowRef } from "vue";
 import {
   commands,
   type PlayerResponse_Deserialize,
@@ -5,67 +6,37 @@ import {
 } from "@/bindings";
 import { router } from "@/router";
 import { useSettings } from "./useSettings";
+import * as state from "./playerState";
+import {
+  reportPlaybackTime,
+  startPlaybackHistory,
+  stopPlaybackHistory,
+} from "./usePlaybackHistory";
+import type {
+  CaptionOption,
+  CurrentVideoMeta,
+  PlayerStatus,
+} from "./playerState";
+import { fetchUpNext } from "./useUpNext";
 
-export interface CaptionOption {
-  id: string;
-  name: string;
-  language: string;
-  url: string;
-}
-
-export interface CurrentVideoMeta {
-  id: string;
-  title: string;
-  channelName: string;
-  channelAvatarUrl?: string;
-  thumbnailUrl?: string;
-  duration: number;
-  viewCount?: string;
-  description?: string;
-}
-
-export type PlayerStatus =
-  | "idle"
-  | "loading"
-  | "playing"
-  | "paused"
-  | "buffering"
-  | "ended"
-  | "error";
+export type { CaptionOption, CurrentVideoMeta, PlayerStatus };
 
 /** A media element that can host an HLS playback engine. */
 type MediaElement = HTMLVideoElement;
 
-const isOpen = ref<boolean>(false);
-const isMiniPlayer = ref<boolean>(false);
-const status = ref<PlayerStatus>("idle");
-const errorMessage = ref<string | null>(null);
-
-const currentVideo = ref<CurrentVideoMeta | null>(null);
-/** Proxied HLS master playlist — the only source the player ever loads. */
-const currentSrc = ref<string>("");
-
-const captionTracks = ref<CaptionOption[]>([]);
-const currentTime = ref<number>(0);
-
+/**
+ * Watch page slot the player is teleported into.
+ */
 const videoElement = shallowRef<MediaElement | null>(null);
-
-/** Watch page slot the player is teleported into. */
 const watchAnchor = shallowRef<HTMLElement | null>(null);
 
 const activeBlobUrls: string[] = [];
 const boundVideos = new WeakSet<HTMLVideoElement>();
 
-const upNextVideo = ref<VideoItem_Deserialize | null>(null);
-const autoplayCountdown = ref<number | null>(null);
-const isAutoplayEnabled = ref<boolean>(true);
 let autoplayTimer: ReturnType<typeof setInterval> | null = null;
-
-/** Watch-history reporting for the video that is currently playing. */
-let historyTimer: ReturnType<typeof setInterval> | null = null;
-let historyVideoId: string | null = null;
-
 let isRecovering = false;
+let pendingResume: { videoId: string; at: number; autoplay: boolean } | null =
+  null;
 
 /**
  * Incremented by every load and by `closePlayer`. A load only publishes its
@@ -87,48 +58,80 @@ function revokeBlobUrls(): void {
 
 export function usePlayer() {
   const { settings, updateSettings } = useSettings();
-  const isPlaying = computed<boolean>(() => status.value === "playing");
+  const isPlaying = computed<boolean>(() => state.status.value === "playing");
+
+  /** Apply the resolved default quality once the element knows its renditions. */
+  function applyResolution(el: HTMLVideoElement): void {
+    const pref = settings.value?.defaultResolution;
+    const renditions = (el as any).videoRenditions;
+    if (!renditions || !pref || pref === "auto") return;
+    const target = parseInt(pref, 10);
+    const list = Array.from(renditions) as any[];
+    const idx = list.findIndex((r) => r.height === target);
+    const chosen = idx !== -1 ? idx : list.findIndex((r) => r.height <= target);
+    if (chosen !== -1) renditions.selectedIndex = chosen;
+  }
+
+  /**
+   * Seek to the position a hand-off handed over, then start playing.
+   *
+   * The video is mounted on demand, so `loadedmetadata` can fire before (or
+   * long after) the load call: the position is kept here until the element that
+   * actually holds the stream reports its metadata.
+   */
+  function applyPendingResume(el: HTMLVideoElement): void {
+    if (!pendingResume) return;
+    if (pendingResume.videoId !== state.currentVideo.value?.id) return;
+
+    const { at, autoplay } = pendingResume;
+    pendingResume = null;
+    if (at > 0 && Number.isFinite(at)) {
+      try {
+        el.currentTime = at;
+      } catch {}
+    }
+    if (autoplay) {
+      el.play().catch((err: unknown) => console.warn("Play interrupted:", err));
+    }
+  }
 
   function attachVideo(el: MediaElement | null): void {
     videoElement.value = el;
+
     if (el && !boundVideos.has(el)) {
       boundVideos.add(el);
 
-      if (settings.value) {
-        el.volume = settings.value.volume || 0.75;
-      }
+      el.volume = settings.value?.volume ?? 0.75;
 
       el.addEventListener("loadeddata", () => {
-        if (status.value === "loading") {
-          status.value = "paused";
+        if (state.status.value === "loading") {
+          state.status.value = "paused";
         }
       });
 
       el.addEventListener("volumechange", () => {
+        state.isMuted.value = el.muted || el.volume === 0;
         updateSettings({ volume: el.volume });
       });
 
-      const applyResolution = () => {
-        const pref = settings.value?.defaultResolution;
-        const renditions = (el as any).videoRenditions;
-        if (!renditions || !pref || pref === "auto") return;
-        const target = parseInt(pref, 10);
-        const list = Array.from(renditions) as any[];
-        const idx = list.findIndex((r) => r.height === target);
-        const chosen =
-          idx !== -1 ? idx : list.findIndex((r) => r.height <= target);
-        if (chosen !== -1) renditions.selectedIndex = chosen;
-      };
+      el.addEventListener("loadedmetadata", () => {
+        applyResolution(el);
+        applyPendingResume(el);
+      });
+      el.addEventListener("loadeddata", () => applyResolution(el));
+    }
 
-      el.addEventListener("loadedmetadata", applyResolution);
-      el.addEventListener("loadeddata", applyResolution);
+    if (el) {
+      state.activeMedia.value = el;
+    } else if (state.activeEngine.value !== "audio") {
+      state.activeMedia.value = null;
     }
   }
 
   /** Tell the player which slot hosts it (null = mini player). */
   function setWatchAnchor(el: HTMLElement | null): void {
     watchAnchor.value = el;
-    isMiniPlayer.value = !el;
+    state.isMiniPlayer.value = !el;
   }
 
   function cancelAutoplay(): void {
@@ -136,39 +139,41 @@ export function usePlayer() {
       clearInterval(autoplayTimer);
       autoplayTimer = null;
     }
-    autoplayCountdown.value = null;
+    state.autoplayCountdown.value = null;
   }
 
   function toggleAutoplay(): void {
-    isAutoplayEnabled.value = !isAutoplayEnabled.value;
-    if (!isAutoplayEnabled.value) {
+    state.isAutoplayEnabled.value = !state.isAutoplayEnabled.value;
+    if (!state.isAutoplayEnabled.value) {
       cancelAutoplay();
     }
   }
 
   function setUpNextVideo(video: VideoItem_Deserialize | null): void {
-    upNextVideo.value = video;
+    state.upNextVideo.value = video;
   }
 
   function playNext(): void {
     cancelAutoplay();
-    const next = upNextVideo.value;
+    const next = state.upNextVideo.value;
     if (!next) return;
 
-    if (router.currentRoute.value.path.startsWith("/watch/")) {
-      void router.push(`/watch/${next.id}`);
-    } else {
-      void loadVideo(next.id, {
-        title: next.title,
-        channelName: next.channelName,
-        thumbnailUrl: next.thumbnailUrl,
-      });
-    }
+    // A Mix is a queue: dropping `list` would turn the next item into a
+    // standalone video and end the Mix after one track.
+    const list = router.currentRoute.value.query.list;
+    const query: Record<string, string> =
+      typeof list === "string" && list ? { list } : {};
+
+    const base = state.activeEngine.value === "audio" ? "/listen" : "/watch";
+    void router.push({ path: `${base}/${next.id}`, query });
   }
 
   interface LoadOptions {
+    /** Position to resume from, in seconds (mode hand-off). */
     resumeAt?: number;
     autoplay?: boolean;
+    /** Metadata to show immediately while the stream URL is being fetched. */
+    meta?: Partial<CurrentVideoMeta>;
     preserveMeta?: boolean;
   }
 
@@ -180,7 +185,11 @@ export function usePlayer() {
     const isStale = (): boolean => token !== loadToken;
 
     cancelAutoplay();
-    upNextVideo.value = null;
+    // A recovery reloads the same video: the queue the page resolved is still
+    // valid and must survive, or the next track would be lost.
+    if (state.currentVideo.value?.id !== videoId) {
+      state.upNextVideo.value = null;
+    }
 
     // Stop the previous video's audio right away, but do not tear the media
     // down here: detaching the engine and clearing the element's src while the
@@ -197,40 +206,23 @@ export function usePlayer() {
     }
 
     // Save where the replaced video stopped, then stop reporting for it.
-    reportWatchTime();
-    stopHistoryReporting();
+    reportPlaybackTime();
+    stopPlaybackHistory(false);
 
-    // Pre-fetch the Up Next video directly from YouTube
-    void commands
-      .getWatchNext(videoId)
-      .then((res) => {
-        if (isStale()) return;
-        if (
-          res.status === "ok" &&
-          res.data.relatedVideos &&
-          res.data.relatedVideos.length > 0
-        ) {
-          upNextVideo.value = res.data.relatedVideos[0];
-        }
-      })
-      .catch((err) => {
-        console.warn("Could not pre-fetch Up Next video:", err);
-      });
-
-    status.value = "loading";
-    errorMessage.value = null;
+    state.status.value = "loading";
+    state.errorMessage.value = null;
     if (!options.resumeAt) {
-      currentTime.value = 0;
+      state.currentTime.value = 0;
     }
 
     if (!options.preserveMeta) {
-      currentVideo.value = {
+      state.currentVideo.value = {
         id: videoId,
-        title: "Loading video...",
-        channelName: "",
-        channelAvatarUrl: "",
-        thumbnailUrl: "",
-        duration: 0,
+        title: options.meta?.title || "Loading video...",
+        channelName: options.meta?.channelName || "",
+        channelAvatarUrl: options.meta?.channelAvatarUrl || "",
+        thumbnailUrl: options.meta?.thumbnailUrl || "",
+        duration: options.meta?.duration || 0,
         viewCount: "",
         description: "",
       };
@@ -249,15 +241,13 @@ export function usePlayer() {
 
       const info: PlayerResponse_Deserialize = infoRes.data;
 
-      currentVideo.value = {
+      state.currentVideo.value = {
         id: info.id || videoId,
-        title: info.title || currentVideo.value?.title || "",
-        channelName: info.channelName || currentVideo.value?.channelName || "",
-        channelAvatarUrl: currentVideo.value?.channelAvatarUrl || "",
-        thumbnailUrl:
-          info.thumbnailUrl || currentVideo.value?.thumbnailUrl || "",
-        duration:
-          Number(info.lengthSeconds) || currentVideo.value?.duration || 0,
+        title: info.title || state.currentVideo.value?.title || "",
+        channelName: info.channelName || state.currentVideo.value?.channelName || "",
+        channelAvatarUrl: state.currentVideo.value?.channelAvatarUrl || "",
+        thumbnailUrl: info.thumbnailUrl || state.currentVideo.value?.thumbnailUrl || "",
+        duration: Number(info.lengthSeconds) || state.currentVideo.value?.duration || 0,
         viewCount: info.viewCount,
         description: info.description,
       };
@@ -302,66 +292,57 @@ export function usePlayer() {
           return;
         }
         activeBlobUrls.push(...createdUrls);
-        captionTracks.value = loaded;
+        state.captionTracks.value = loaded;
       } else {
-        captionTracks.value = [];
+        state.captionTracks.value = [];
       }
 
       if (!info.hlsManifestUrl) {
         throw new Error("This video has no HLS stream available");
       }
 
-      const video = videoElement.value;
-      const resumeAt = options.resumeAt ?? 0;
-      if (video && resumeAt > 0) {
-        video.addEventListener(
-          "loadedmetadata",
-          () => {
-            // The element may already be loading a newer video by now.
-            if (isStale()) return;
-            video.currentTime = resumeAt;
-            if (options.autoplay ?? true) {
-              video.play().catch(() => {});
+      pendingResume =
+        options.resumeAt && options.resumeAt > 0
+          ? {
+              videoId,
+              at: options.resumeAt,
+              autoplay: options.autoplay ?? true,
             }
-          },
-          { once: true },
-        );
-      }
+          : null;
 
-      currentSrc.value = info.hlsManifestUrl;
+      state.currentSrc.value = info.hlsManifestUrl;
+
+      // Resolve the audio-only URL while the video is still playing: the Rust
+      // side reuses this player response and caches the result, so the switch
+      // to audio mode only pays for the media fetch itself.
+      void commands.getAudioStream(videoId).catch(() => {});
     } catch (err: unknown) {
       // A cancelled load is not a failure: it no longer owns this player.
       if (isStale()) {
         return;
       }
       console.error("Error loading video:", err);
-      status.value = "error";
-      errorMessage.value =
+      state.status.value = "error";
+      state.errorMessage.value =
         err instanceof Error ? err.message : "Failed to play video";
     }
   }
 
   async function loadVideo(
     videoId: string,
-    initialMeta?: Partial<CurrentVideoMeta>,
+    options: LoadOptions = {},
   ): Promise<void> {
-    isOpen.value = true;
+    state.videoReleased.value = false;
+    state.activeEngine.value = "video";
+    state.isOpen.value = true;
+    state.isMiniPlayer.value = false;
     isRecovering = false;
 
-    if (initialMeta) {
-      currentVideo.value = {
-        id: videoId,
-        title: initialMeta.title || "Loading video...",
-        channelName: initialMeta.channelName || "",
-        channelAvatarUrl: initialMeta.channelAvatarUrl || "",
-        thumbnailUrl: initialMeta.thumbnailUrl || "",
-        duration: initialMeta.duration || 0,
-        viewCount: initialMeta.viewCount || "",
-        description: initialMeta.description || "",
-      };
-    }
+    // The audio engine owns the shared state while it is active; taking the
+    // engine back has to start from a clean slate.
+    state.captionTracks.value = [];
 
-    await loadStream(videoId, { preserveMeta: Boolean(initialMeta) });
+    await loadStream(videoId, options);
   }
 
   /**
@@ -373,17 +354,17 @@ export function usePlayer() {
   async function recoverStream(
     opts: { manual?: boolean } = {},
   ): Promise<boolean> {
-    const video = currentVideo.value;
+    const video = state.currentVideo.value;
     const element = videoElement.value;
     if (!video || !element || isRecovering) {
       return false;
     }
     // Never fight a load that is already running: the error that asks for this
     // recovery usually comes from the previous video being switched out.
-    if (status.value === "loading") {
+    if (state.status.value === "loading") {
       return false;
     }
-    if (!opts.manual && status.value !== "error") {
+    if (!opts.manual && state.status.value !== "error") {
       return false;
     }
 
@@ -396,116 +377,88 @@ export function usePlayer() {
         autoplay: wasPlaying,
         preserveMeta: true,
       });
-      return status.value !== "error";
+      return state.status.value !== "error";
     } finally {
       isRecovering = false;
     }
   }
 
-  /**
-   * Report where playback currently is, so the account remembers the resume
-   * position (YouTube's watch-time event).
-   */
-  function reportWatchTime(): void {
-    const videoId = historyVideoId;
-    const element = videoElement.value;
-    if (!videoId || !element) return;
-    const seconds = element.currentTime;
-    if (!Number.isFinite(seconds) || seconds <= 0) return;
-
-    void commands
-      .updateWatchTime(videoId, Math.round(seconds * 100) / 100)
-      .then((res) => {
-        if (res.status !== "ok") {
-          console.warn("Could not update watch time:", res.error.message);
-        }
-      })
-      .catch((err) => {
-        console.warn("Could not update watch time:", err);
-      });
-  }
-
-  function stopHistoryReporting(): void {
-    if (historyTimer) {
-      clearInterval(historyTimer);
-      historyTimer = null;
-    }
-    historyVideoId = null;
-  }
-
-  /**
-   * Put the video into the account's watch history once, then keep its
-   * watch-time fresh while it plays.
-   */
-  function startHistoryReporting(videoId: string): void {
-    if (historyVideoId === videoId) return;
-
-    if (historyTimer) {
-      reportWatchTime();
-      clearInterval(historyTimer);
-      historyTimer = null;
-    }
-
-    historyVideoId = videoId;
-    void commands
-      .recordWatchStart(videoId)
-      .then((res) => {
-        if (res.status !== "ok") {
-          console.warn("Could not record watch history:", res.error.message);
-        }
-      })
-      .catch((err) => {
-        console.warn("Could not record watch history:", err);
-      });
-
-    historyTimer = setInterval(reportWatchTime, 30_000);
-  }
-
   function onPlay(): void {
     cancelAutoplay();
-    status.value = "playing";
-    const videoId = currentVideo.value?.id;
-    if (videoId) startHistoryReporting(videoId);
+    state.status.value = "playing";
+    const videoId = state.currentVideo.value?.id;
+    if (videoId) {
+      startPlaybackHistory(videoId, () => videoElement.value?.currentTime ?? 0);
+    }
   }
 
   function onPause(): void {
-    if (status.value !== "ended") {
-      status.value = "paused";
+    if (state.status.value !== "ended") {
+      state.status.value = "paused";
     }
-    reportWatchTime();
+    reportPlaybackTime();
   }
 
   function onTimeUpdate(e: Event): void {
-    const el = e.target as HTMLVideoElement | null;
-    if (el) {
-      currentTime.value = el.currentTime;
+    const el = e.target as HTMLMediaElement | null;
+    if (!el) return;
+    state.currentTime.value = el.currentTime;
+
+    // Some HLS playlists are served as a live/DVR window and never emit
+    // `ended`; treat "reached the known duration" as the end so a Mix keeps
+    // playing. The status guard makes this fire once.
+    const total = state.currentVideo.value?.duration || 0;
+    if (
+      total > 0 &&
+      !el.paused &&
+      !el.seeking &&
+      state.status.value !== "ended" &&
+      el.currentTime >= total - 0.75
+    ) {
+      onEnded();
     }
   }
 
   function onWaiting(): void {
-    if (status.value !== "error") {
-      status.value = "buffering";
+    if (state.status.value !== "error" && state.status.value !== "ended") {
+      state.status.value = "buffering";
     }
   }
 
   function onPlaying(): void {
-    status.value = "playing";
+    state.status.value = "playing";
   }
 
-  function onEnded(): void {
-    status.value = "ended";
-    reportWatchTime();
-    if (!isAutoplayEnabled.value || !upNextVideo.value) return;
+  async function onEnded(): Promise<void> {
+    if (state.status.value === "ended") return;
+
+    state.status.value = "ended";
+    reportPlaybackTime();
+    if (!state.isAutoplayEnabled.value) return;
+
+    // The page normally resolved the queue, but a Mix must keep playing even
+    // when that result was lost (recovery reload, failed fetch, …).
+    const videoId = state.currentVideo.value?.id;
+    const list = router.currentRoute.value.query.list;
+    const playlistId = typeof list === "string" && list ? list : null;
+    const next =
+      state.upNextVideo.value ??
+      (videoId ? await fetchUpNext(videoId, playlistId) : null);
+    if (!next) {
+      console.warn("[autoplay] no next video resolved for", videoId);
+      return;
+    }
+    state.upNextVideo.value = next;
 
     cancelAutoplay();
-    autoplayCountdown.value = 4;
+    state.autoplayCountdown.value = 4;
     autoplayTimer = setInterval(() => {
-      if (autoplayCountdown.value === null) {
+      if (state.autoplayCountdown.value === null) {
         cancelAutoplay();
         return;
       }
-      autoplayCountdown.value -= 1;
-      if (autoplayCountdown.value <= 0) {
+      state.autoplayCountdown.value -= 1;
+      if (state.autoplayCountdown.value <= 0) {
         cancelAutoplay();
         playNext();
       }
@@ -513,13 +466,13 @@ export function usePlayer() {
   }
 
   function onError(e: Event | unknown): void {
-    if (!currentSrc.value || !isOpen.value) {
+    if (!state.currentSrc.value || !state.isOpen.value) {
       return;
     }
     // Switching videos tears the old stream down, and that teardown can emit a
     // media error. It is not a playback failure and must never cancel the load
     // that is already in flight.
-    if (status.value === "loading") {
+    if (state.status.value === "loading") {
       return;
     }
     const target = (e as Event)?.target as HTMLElement | null;
@@ -532,8 +485,8 @@ export function usePlayer() {
     }
 
     console.error("Video player error:", e, mediaErr);
-    status.value = "error";
-    errorMessage.value = "Failed to stream video. Please try again.";
+    state.status.value = "error";
+    state.errorMessage.value = "Failed to stream video. Please try again.";
 
     // A network/source failure usually means the playlist expired.
     if (!mediaErr || mediaErr.code === 2 || mediaErr.code === 4) {
@@ -541,8 +494,9 @@ export function usePlayer() {
     }
   }
 
+  /** Pause/play whichever engine currently holds the media element. */
   function togglePlay(): void {
-    const el = videoElement.value;
+    const el = state.activeMedia.value;
     if (!el) return;
     if (el.paused) {
       el.play().catch((err: unknown) => console.warn("Play interrupted:", err));
@@ -551,69 +505,124 @@ export function usePlayer() {
     }
   }
 
-  /**
-   * Close the player and release everything the stream holds.
-   *
-   * The Video.js elements themselves stay mounted (they are reused by the next
-   * video, and a destroyed element cannot be reconnected), so this only tears
-   * down the stream: the pending load is cancelled, caption object URLs are
-   * revoked, and the empty source makes the HLS adapter drop its media source
-   * and buffers.
-   */
-  function closePlayer(): void {
-    cancelAutoplay();
-    upNextVideo.value = null;
-    loadToken++;
-    isOpen.value = false;
-    status.value = "idle";
-    currentVideo.value = null;
-    isRecovering = false;
-    revokeBlobUrls();
-    captionTracks.value = [];
+  function seek(seconds: number): void {
+    const el = state.activeMedia.value;
+    if (!el) return;
+    try {
+      el.currentTime = seconds;
+    } catch {}
+    state.currentTime.value = seconds;
+  }
 
-    // Remember the last position before dropping the session.
-    reportWatchTime();
-    stopHistoryReporting();
+  function setVolume(volume: number): void {
+    const el = state.activeMedia.value;
+    if (el) {
+      el.volume = volume;
+      if (volume > 0 && el.muted) el.muted = false;
+    }
+    void updateSettings({ volume });
+  }
 
-    // Close must not empty the media source. The HLS adapter infers the
-    // content type from the URL and treats an empty one as HLS, so clearing it
-    // made hls.js fetch the page URL as a playlist and fail with
-    // "no EXTM3U delimiter" — the error dialog users saw when switching video.
-    // Pausing and stopping the load keeps the element valid for the next load.
-    const element = videoElement.value as any;
-    if (element) {
-      try {
-        element.pause();
-      } catch {}
-      try {
-        element.engine?.stopLoad?.();
-      } catch {}
+  function toggleMute(): void {
+    const el = state.activeMedia.value;
+    if (!el) return;
+    if (el.muted || el.volume === 0) {
+      el.muted = false;
+      el.volume = settings.value?.volume ?? 0.75;
+    } else {
+      el.muted = true;
     }
   }
 
+  /**
+   * Tear the Video.js tree down and release its engine.
+   *
+   * `closePlayer` and the audio engine both need this: the HLS instance, its
+   * SourceBuffers and the decoder only go away when the element unmounts.
+   */
+  async function releaseVideoEngine(): Promise<void> {
+    const el = videoElement.value;
+    if (el) {
+      try {
+        el.pause();
+      } catch {}
+      try {
+        (el as any).engine?.stopLoad?.();
+      } catch {}
+    }
+
+    state.videoReleased.value = true;
+    // Unmount first, then clear the source: clearing it while the element is
+    // still alive makes the HLS adapter treat the empty URL as a playlist.
+    await nextTick();
+    state.currentSrc.value = "";
+    state.captionTracks.value = [];
+  }
+
+  /**
+   * Close the player and release everything the stream holds.
+   */
+  function closePlayer(): void {
+    cancelAutoplay();
+    state.upNextVideo.value = null;
+    loadToken++;
+    state.isOpen.value = false;
+    state.status.value = "idle";
+    state.currentVideo.value = null;
+    state.errorMessage.value = null;
+    isRecovering = false;
+    revokeBlobUrls();
+    state.captionTracks.value = [];
+
+    // Remember the last position before dropping the session.
+    reportPlaybackTime();
+    stopPlaybackHistory(false);
+
+    if (state.activeEngine.value === "audio") {
+      // Closing the audio player must not clear the video source by accident.
+      const media = state.activeMedia.value;
+      if (media instanceof HTMLAudioElement) {
+        try {
+          media.pause();
+          media.removeAttribute("src");
+          media.load();
+        } catch {}
+      }
+      state.activeEngine.value = null;
+      return;
+    }
+
+    state.activeEngine.value = null;
+    void releaseVideoEngine();
+  }
+
   function minimizeToMiniPlayer(): void {
-    isMiniPlayer.value = true;
+    state.isMiniPlayer.value = true;
   }
 
   function restoreFromMiniPlayer(): void {
-    isMiniPlayer.value = false;
+    state.isMiniPlayer.value = false;
   }
 
   return {
-    isOpen,
-    isMiniPlayer,
-    status,
-    errorMessage,
-    currentVideo,
-    currentSrc,
-    captionTracks,
-    currentTime,
+    isOpen: state.isOpen,
+    isMiniPlayer: state.isMiniPlayer,
+    status: state.status,
+    errorMessage: state.errorMessage,
+    currentVideo: state.currentVideo,
+    currentSrc: state.currentSrc,
+    captionTracks: state.captionTracks,
+    currentTime: state.currentTime,
     isPlaying,
+    isMuted: state.isMuted,
+    activeEngine: state.activeEngine,
+    activeMedia: state.activeMedia,
+    videoReleased: state.videoReleased,
     videoElement,
     watchAnchor,
-    upNextVideo,
-    autoplayCountdown,
-    isAutoplayEnabled,
+    upNextVideo: state.upNextVideo,
+    autoplayCountdown: state.autoplayCountdown,
+    isAutoplayEnabled: state.isAutoplayEnabled,
     attachVideo,
     setWatchAnchor,
     loadVideo,
@@ -626,7 +635,11 @@ export function usePlayer() {
     onEnded,
     onError,
     togglePlay,
+    seek,
+    setVolume,
+    toggleMute,
     closePlayer,
+    releaseVideoEngine,
     minimizeToMiniPlayer,
     restoreFromMiniPlayer,
     cancelAutoplay,

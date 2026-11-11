@@ -1,13 +1,10 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute, useRouter, onBeforeRouteLeave } from "vue-router";
 import { usePlayer } from "@/composables/usePlayer";
+import { useAudioPlayer } from "@/composables/useAudioPlayer";
 import { useSettings } from "@/composables/useSettings";
-import {
-  commands,
-  type VideoItem_Deserialize,
-  type WatchNextResults_Deserialize,
-} from "@/bindings";
+import { useVideoPage, resumeFromQuery } from "@/composables/useVideoPage";
 import WatchPlaylistQueue from "@/components/playlist/WatchPlaylistQueue.vue";
 import {
   ThumbsUp,
@@ -25,6 +22,7 @@ defineOptions({ name: "WatchPage" });
 const route = useRoute();
 const router = useRouter();
 const player = usePlayer();
+const audio = useAudioPlayer();
 const { settings } = useSettings();
 
 const videoId = computed(
@@ -45,73 +43,43 @@ const playlistIndex = computed(() => {
   return null;
 });
 
-const watchNext = ref<WatchNextResults_Deserialize | null>(null);
-const isLoadingRelated = ref(false);
+const {
+  watchNext,
+  loading: isLoadingRelated,
+  load: loadWatchNext,
+  selectRelated: selectRelatedVideo,
+} = useVideoPage(videoId, playlistId, playlistIndex);
+
 const isDescriptionExpanded = ref(false);
 const watchSlotRef = ref<HTMLDivElement | null>(null);
 
-async function loadWatchData(id: string) {
+function startPlayback(id: string): void {
   if (!id) return;
 
-  const playerAlreadyHasVideo =
-    player.isOpen.value &&
+  // The player may already be showing this video (returning from the mini
+  // player): reloading it would drop the position for no reason.
+  const alreadyLoaded =
+    player.activeEngine.value === "video" &&
     player.currentVideo.value?.id === id &&
     player.status.value !== "error" &&
     (player.status.value === "loading" || Boolean(player.currentSrc.value));
 
-  if (!playerAlreadyHasVideo) {
-    player.loadVideo(id);
+  if (!alreadyLoaded) {
+    // The audio engine may still be holding the previous track: hand the
+    // session back to the video engine before loading.
+    audio.stopAudio();
+    void player.loadVideo(id, {
+      resumeAt: resumeFromQuery(route.query),
+      autoplay: true,
+    });
   }
 
-  // Fetch Watch Next results (related videos & playlist context)
-  isLoadingRelated.value = true;
-  try {
-    const res = await commands.getWatchNext(
-      id,
-      playlistId.value,
-      playlistIndex.value,
-    );
-    if (res.status === "ok") {
-      watchNext.value = res.data;
-
-      // If playing within a playlist / mix, queue up the next song
-      if (res.data.playlistItems && res.data.playlistItems.length > 0) {
-        const curIdx = res.data.playlistItems.findIndex(
-          (p) => p.videoId === id || p.isSelected,
-        );
-        const nextItem =
-          curIdx >= 0 && curIdx + 1 < res.data.playlistItems.length
-            ? res.data.playlistItems[curIdx + 1]
-            : null;
-        if (nextItem) {
-          player.setUpNextVideo({
-            id: nextItem.videoId,
-            title: nextItem.title,
-            thumbnailUrl: nextItem.thumbnailUrl,
-            duration: "",
-            channelName: nextItem.author,
-            channelAvatarUrl: "",
-            isVerified: false,
-            isLive: false,
-            viewCount: "",
-            publishedAt: "",
-            playlistId: playlistId.value || undefined,
-          });
-        }
-      } else if (res.data.relatedVideos && res.data.relatedVideos.length > 0) {
-        player.setUpNextVideo(res.data.relatedVideos[0]);
-      }
-    }
-  } catch (err) {
-    console.warn("Failed to load watch next details:", err);
-  } finally {
-    isLoadingRelated.value = false;
-  }
+  void loadWatchNext();
 }
 
 onMounted(() => {
   if (settings.value.playbackMode !== "normal" && videoId.value) {
-    router.replace({
+    void router.replace({
       path: `/listen/${videoId.value}`,
       query: route.query,
     });
@@ -121,21 +89,9 @@ onMounted(() => {
     player.setWatchAnchor(watchSlotRef.value);
   }
   if (videoId.value) {
-    loadWatchData(videoId.value);
+    startPlayback(videoId.value);
   }
 });
-
-watch(
-  () => settings.value.playbackMode,
-  (mode) => {
-    if (mode !== "normal" && videoId.value) {
-      router.replace({
-        path: `/listen/${videoId.value}`,
-        query: route.query,
-      });
-    }
-  },
-);
 
 onBeforeRouteLeave(() => {
   player.setWatchAnchor(null);
@@ -150,23 +106,10 @@ watch(
   [() => videoId.value, () => route.query.list, () => route.query.index],
   ([newId]) => {
     if (newId) {
-      loadWatchData(newId);
+      startPlayback(newId);
     }
   },
 );
-
-function selectRelatedVideo(item: VideoItem_Deserialize) {
-  const isNormal = settings.value.playbackMode === "normal";
-  const basePath = isNormal ? "/watch" : "/listen";
-  if (item.playlistId) {
-    router.push({
-      path: `${basePath}/${item.id}`,
-      query: { list: item.playlistId },
-    });
-  } else {
-    router.push(`${basePath}/${item.id}`);
-  }
-}
 </script>
 
 <template>
@@ -381,7 +324,7 @@ function selectRelatedVideo(item: VideoItem_Deserialize) {
               class="text-[10px] text-muted-foreground/80 flex items-center gap-1 mt-0.5"
             >
               <span v-if="item.viewCount">{{ item.viewCount }}</span>
-              <span v-if="item.viewCount && item.publishedAt">•</span>
+              <span v-if="item.viewCount && item.publishedAt">â€¢</span>
               <span v-if="item.publishedAt">{{ item.publishedAt }}</span>
             </div>
           </div>

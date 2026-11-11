@@ -19,6 +19,9 @@ pub(super) async fn serve(
     let Some(url) = params.get("url").filter(|u| !u.is_empty()).cloned() else {
         return write_text(stream, 400, "missing url").await;
     };
+    if !super::is_allowed_stream_host(&url) {
+        return write_text(stream, 403, "host not allowed").await;
+    }
     let video_id = params.get("vid").cloned().unwrap_or_default();
     let is_playlist = url.contains("hls_variant") || url.contains("hls_playlist");
 
@@ -48,6 +51,9 @@ async fn serve_refreshed(
     let Some(raw) = refresher(video_id.to_string()).await else {
         return write_text(stream, 502, "no fresh playlist").await;
     };
+    if !super::is_allowed_stream_host(&raw) {
+        return write_text(stream, 502, "no fresh playlist").await;
+    }
 
     match fetch(client, &raw).await {
         Ok(response) => serve_response(stream, response, &raw, video_id, is_playlist, method).await,
@@ -232,23 +238,25 @@ mod tests {
 
     #[test]
     fn rewrites_variant_and_segment_uris() {
+        force_port(1234);
         let master = "#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=1,RESOLUTION=1920x1080\nhttps://manifest.googlevideo.com/api/manifest/hls_playlist/abc/index.m3u8\n";
         let out = rewrite_playlist(master, "https://manifest.googlevideo.com/x", "vid1");
         assert!(out.starts_with("#EXTM3U"));
         assert!(out.contains("RESOLUTION=1920x1080"));
-        assert!(out.contains(&prefix()));
+        assert!(out.contains(&prefix()), "got: {out}");
         assert!(!out.contains("\nhttps://manifest.googlevideo.com"));
     }
 
     #[test]
     fn rewrites_uri_attributes_and_relative_paths() {
+        force_port(1234);
         let media = "#EXTM3U\n#EXT-X-KEY:METHOD=AES-128,URI=\"key.bin\"\n#EXTINF:2.0,\nseg1.m4s\n";
         let out = rewrite_playlist(
             media,
             "https://manifest.googlevideo.com/a/b/index.m3u8",
             "vid1",
         );
-        assert!(out.contains(&format!("URI=\"{}", prefix())));
+        assert!(out.contains(&format!("URI=\"{}", prefix())), "got: {out}");
         assert!(out.contains("key.bin"));
         assert!(out.contains("seg1.m4s"));
     }
