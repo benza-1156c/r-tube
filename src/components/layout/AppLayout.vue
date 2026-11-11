@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useRoute } from "vue-router";
 import { computed, onMounted, onBeforeUnmount } from "vue";
+import { previousPath } from "@/router";
 import AppTitleBar from "@/components/layout/AppTitleBar.vue";
 import PlaybackModeOsd from "@/components/layout/PlaybackModeOsd.vue";
 import GlobalVideoPlayer from "@/components/player/GlobalVideoPlayer.vue";
@@ -13,6 +14,14 @@ const shouldHideSidebar = computed(() => Boolean(route.meta.hideSidebar));
 const shouldHideHeader = computed(() => Boolean(route.meta.hideHeader));
 
 const { position, hostStyle, clampToViewport } = useMiniPlayerDraggable();
+
+const isPlayerRoute = (path: string): boolean =>
+  path.startsWith("/watch/") || path.startsWith("/listen/");
+
+/** Player → player swaps are instant; everything else uses the `page` fade. */
+function pageTransitionName(to: string, from: string): string {
+  return isPlayerRoute(to) && isPlayerRoute(from) ? "" : "page";
+}
 
 onMounted(() => {
   window.addEventListener("resize", clampToViewport);
@@ -39,11 +48,16 @@ onBeforeUnmount(() => {
       <SidebarInset class="flex flex-col flex-1 min-w-0 overflow-hidden">
         <AppHeader v-if="!shouldHideHeader" :hide-sidebar="shouldHideSidebar" />
 
-        <main class="flex-1 overflow-y-auto">
+        <main class="flex-1 overflow-y-auto overflow-x-hidden">
           <router-view v-slot="{ Component, route: currentRoute }">
-            <keep-alive exclude="WatchPage,ListenPage">
-              <component :is="Component" :key="currentRoute.fullPath" />
-            </keep-alive>
+            <Transition
+              :name="pageTransitionName(currentRoute.path, previousPath)"
+              mode="out-in"
+            >
+              <keep-alive exclude="WatchPage,ListenPage">
+                <component :is="Component" :key="currentRoute.fullPath" />
+              </keep-alive>
+            </Transition>
           </router-view>
         </main>
       </SidebarInset>
