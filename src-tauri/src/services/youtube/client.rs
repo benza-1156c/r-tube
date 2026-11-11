@@ -15,8 +15,9 @@ use tokio::sync::RwLock;
 use crate::db::entities::profile;
 use crate::error::AppError;
 use crate::models::youtube::{
-    AudioStreamInfo, CaptionTrack, PlayerResponse, PlaylistContinuationResult, PlaylistDetailView,
-    SearchSuggestionItem, VideoItem, WatchNextResults,
+    AudioStreamInfo, CaptionTrack, ChannelInfo, ChannelPage, ChannelVideo, CommentsPage,
+    PlayerResponse, PlaylistContinuationResult, PlaylistDetailView, SearchSuggestionItem,
+    VideoComment, VideoItem, WatchNextResults,
 };
 use crate::services::youtube::cookie::CookieManager;
 
@@ -419,27 +420,36 @@ impl YoutubeClient {
         )
         .map_err(|e| AppError::Internal(format!("Failed to resolve audio stream: {e}")))?;
 
-        let (title, author, thumbnail_url, length_seconds, description, view_count, is_live) =
-            player_response
-                .video_details
-                .as_ref()
-                .map(|details| {
-                    (
-                        details.title.clone(),
-                        details.author.clone(),
-                        details
-                            .thumbnail
-                            .as_ref()
-                            .and_then(|thumbnail| thumbnail.thumbnails.last())
-                            .map(|thumbnail| thumbnail.url.clone())
-                            .unwrap_or_default(),
-                        details.length_seconds.clone(),
-                        details.short_description.clone().unwrap_or_default(),
-                        details.view_count.clone().unwrap_or_default(),
-                        details.is_live.unwrap_or(false),
-                    )
-                })
-                .unwrap_or_default();
+        let (
+            title,
+            author,
+            channel_id,
+            thumbnail_url,
+            length_seconds,
+            description,
+            view_count,
+            is_live,
+        ) = player_response
+            .video_details
+            .as_ref()
+            .map(|details| {
+                (
+                    details.title.clone(),
+                    details.author.clone(),
+                    details.channel_id.clone(),
+                    details
+                        .thumbnail
+                        .as_ref()
+                        .and_then(|thumbnail| thumbnail.thumbnails.last())
+                        .map(|thumbnail| thumbnail.url.clone())
+                        .unwrap_or_default(),
+                    details.length_seconds.clone(),
+                    details.short_description.clone().unwrap_or_default(),
+                    details.view_count.clone().unwrap_or_default(),
+                    details.is_live.unwrap_or(false),
+                )
+            })
+            .unwrap_or_default();
 
         Ok(AudioStreamInfo {
             itag: format.itag,
@@ -457,6 +467,7 @@ impl YoutubeClient {
             language: format.language(),
             title,
             author,
+            channel_id,
             thumbnail_url,
             length_seconds,
             description,
@@ -588,6 +599,143 @@ impl YoutubeClient {
             .await
             .map_err(|e| AppError::Internal(format!("Failed to get watch history: {e}")))?;
         Ok(feed.videos.iter().map(VideoItem::from).collect())
+    }
+
+    /// One page of comments for a video (pass a continuation for the next page).
+    pub async fn get_comments(
+        &self,
+        video_id: &str,
+        continuation: Option<&str>,
+    ) -> Result<CommentsPage, AppError> {
+        let yt = self.signed().await?;
+        let res = yt
+            .get_comments_with_options(video_id, None, None, continuation)
+            .await
+            .map_err(|e| AppError::Internal(format!("Failed to fetch comments: {e}")))?;
+
+        Ok(CommentsPage {
+            total: res.total_comments_text,
+            comments: res.comments.into_iter().map(comment_thread_from).collect(),
+            continuation: res.continuation_token,
+        })
+    }
+
+    /// Channel header plus its Videos tab.
+    pub async fn get_channel_page(&self, channel_id: &str) -> Result<ChannelPage, AppError> {
+        let yt = self.signed().await?;
+        let about = yt.get_channel_about(channel_id).await.ok();
+        let videos = yt
+            .get_channel_videos(channel_id, None)
+            .await
+            .map_err(|e| AppError::Internal(format!("Failed to fetch channel videos: {e}")))?;
+
+        let info = ChannelInfo {
+            id: about
+                .as_ref()
+                .map(|about| about.channel_id.clone())
+                .unwrap_or_else(|| channel_id.to_string()),
+            name: about.as_ref().map(|about| about.title.clone()).unwrap_or_default(),
+            avatar: about.as_ref().and_then(|about| about.avatar.clone()),
+            banner: about.as_ref().and_then(|about| about.banner.clone()),
+            subscriber_count: about
+                .as_ref()
+                .and_then(|about| about.subscriber_count.clone()),
+            video_count: about.as_ref().and_then(|about| about.video_count.clone()),
+            description: about.as_ref().and_then(|about| about.description.clone()),
+        };
+
+        Ok(ChannelPage {
+            info,
+            videos: videos
+                .videos
+                .into_iter()
+                .map(|video| ChannelVideo {
+                    id: video.video_id,
+                    title: video.title,
+                    thumbnail: video.thumbnail,
+                    duration: video.duration,
+                    published: video.published_time,
+                    views: video.views,
+                })
+                .collect(),
+            continuation: videos.continuation_token,
+        })
+    }
+
+    /// Like / dislike / clear the rating of a video.
+    pub async fn rate_video(&self, video_id: &str, rating: &str) -> Result<(), AppError> {
+        let yt = self.signed().await?;
+        let actions = yt.actions();
+        let result = match rating {
+            "like" => actions.like(video_id).await,
+            "dislike" => actions.dislike(video_id).await,
+            _ => actions.remove_rating(video_id).await,
+        };
+        result.map_err(|e| AppError::Internal(format!("Failed to rate video: {e}")))?;
+        Ok(())
+    }
+
+    /// Subscribe to or unsubscribe from a channel.
+    pub async fn set_subscription(
+        &self,
+        channel_id: &str,
+        subscribed: bool,
+    ) -> Result<(), AppError> {
+        let yt = self.signed().await?;
+        let ids = [channel_id];
+        let actions = yt.actions();
+        let result = if subscribed {
+            actions.subscribe(&ids).await
+        } else {
+            actions.unsubscribe(&ids).await
+        };
+        result.map_err(|e| AppError::Internal(format!("Failed to update subscription: {e}")))?;
+        Ok(())
+    }
+
+    /// Search with YouTube's own filters (type, sort order, upload date).
+    pub async fn search_filtered(
+        &self,
+        query: &str,
+        continuation_token: Option<&str>,
+        search_type: Option<&str>,
+        sort: Option<&str>,
+        upload_date: Option<&str>,
+    ) -> Result<SearchResults, AppError> {
+        let filters = innertube_rs::SearchFilters {
+            prioritize: match sort {
+                Some("popularity") => Some(innertube_rs::SearchPrioritize::Popularity),
+                _ => None,
+            },
+            upload_date: match upload_date {
+                Some("today") => Some(innertube_rs::UploadDateFilter::Today),
+                Some("week") => Some(innertube_rs::UploadDateFilter::Week),
+                Some("month") => Some(innertube_rs::UploadDateFilter::Month),
+                Some("year") => Some(innertube_rs::UploadDateFilter::Year),
+                _ => None,
+            },
+            search_type: match search_type {
+                Some("video") => Some(innertube_rs::SearchTypeFilter::Video),
+                Some("channel") => Some(innertube_rs::SearchTypeFilter::Channel),
+                Some("playlist") => Some(innertube_rs::SearchTypeFilter::Playlist),
+                _ => None,
+            },
+            duration: None,
+            features: Vec::new(),
+        };
+
+        let has_filters = filters.prioritize.is_some()
+            || filters.upload_date.is_some()
+            || filters.search_type.is_some();
+
+        let yt = self.signed().await?;
+        yt.search_with_filters(
+            query,
+            has_filters.then_some(&filters),
+            continuation_token,
+        )
+        .await
+        .map_err(|e| AppError::Internal(format!("YouTube search failed: {e}")))
     }
 
     /// Sync Set-Cookie headers manually (e.g. from Webview or external response)
@@ -776,6 +924,28 @@ impl YoutubeClient {
             handle,
         })
     }
+}
+
+fn comment_from(comment: innertube_rs::Comment) -> VideoComment {
+    VideoComment {
+        id: comment.comment_id,
+        author: comment.author_name,
+        author_thumbnail: comment.author_thumbnail,
+        author_channel_id: comment.author_channel_id,
+        text: comment.text,
+        likes: comment.like_count_text,
+        published_time: comment.published_time,
+        is_pinned: comment.is_pinned,
+        is_owner: comment.is_author_channel_owner,
+        reply_count: comment.reply_count.map(|count| count as f64),
+        replies: Vec::new(),
+    }
+}
+
+fn comment_thread_from(thread: innertube_rs::CommentThread) -> VideoComment {
+    let mut top = comment_from(thread.comment);
+    top.replies = thread.replies.into_iter().map(comment_from).collect();
+    top
 }
 
 fn playable_audio(format: &StreamingFormat) -> bool {

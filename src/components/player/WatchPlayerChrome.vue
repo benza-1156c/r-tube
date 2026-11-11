@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { usePlayer } from "@/composables/usePlayer";
-import { ListVideo, Minimize2 } from "@lucide/vue";
+import { ListVideo, Minimize2, PictureInPicture2 } from "@lucide/vue";
 import PlayerQualityMenu from "./PlayerQualityMenu.vue";
 
 defineOptions({ name: "WatchPlayerChrome" });
@@ -32,6 +32,16 @@ const player = usePlayer();
       @click.stop="player.toggleAutoplay()"
     >
       <ListVideo class="h-4 w-4" />
+    </button>
+
+    <button
+      type="button"
+      class="rt-chrome-btn"
+      title="Picture in picture"
+      aria-label="Picture in picture"
+      @click.stop="void player.togglePictureInPicture()"
+    >
+      <PictureInPicture2 class="h-4 w-4" />
     </button>
 
     <button

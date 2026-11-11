@@ -61,6 +61,7 @@ const currentThumbnail = computed(() => {
 });
 
 function startPlayback(id: string): void {
+  const resumeAt = resumeFromQuery(route.query);
   if (!id) return;
 
   // Re-entering the same track (for example after a re-render) must not restart
@@ -71,7 +72,7 @@ function startPlayback(id: string): void {
     player.status.value !== "error";
   if (!alreadyLoaded) {
     void audio.loadAudio(id, {
-      resumeAt: resumeFromQuery(route.query),
+      resumeAt: resumeAt > 0 ? resumeAt : undefined,
       autoplay: true,
     });
   }

@@ -21,6 +21,7 @@ export interface CurrentVideoMeta {
   id: string;
   title: string;
   channelName: string;
+  channelId?: string;
   channelAvatarUrl?: string;
   thumbnailUrl?: string;
   duration: number;

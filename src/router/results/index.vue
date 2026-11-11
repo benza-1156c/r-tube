@@ -26,6 +26,31 @@ const continuation = ref<string | null>(null);
 const bottomTarget = ref<HTMLElement | null>(null);
 let observer: IntersectionObserver | null = null;
 
+type SearchType = "all" | "video" | "playlist";
+type SearchSort = "relevance" | "popularity";
+
+const searchType = ref<SearchType>("all");
+const sort = ref<SearchSort>("relevance");
+
+const typeOptions: { value: SearchType; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "video", label: "Videos" },
+  { value: "playlist", label: "Playlists" },
+];
+
+const sortOptions: { value: SearchSort; label: string }[] = [
+  { value: "relevance", label: "Relevance" },
+  { value: "popularity", label: "Popular" },
+];
+
+function searchTypeParam(): string | null {
+  return searchType.value === "all" ? null : searchType.value;
+}
+
+function sortParam(): string | null {
+  return sort.value === "relevance" ? null : sort.value;
+}
+
 async function loadInitialSearch() {
   if (!query.value) {
     videos.value = [];
@@ -37,7 +62,13 @@ async function loadInitialSearch() {
   isLoading.value = true;
   continuation.value = null;
   try {
-    const res = await commands.search(query.value, null);
+    const res = await commands.search(
+      query.value,
+      null,
+      searchTypeParam(),
+      sortParam(),
+      null,
+    );
     if (res.status === "ok") {
       videos.value = res.data.videos ?? [];
       playlists.value = res.data.playlists ?? [];
@@ -62,7 +93,13 @@ async function loadMoreSearch() {
 
   isLoadingMore.value = true;
   try {
-    const res = await commands.search(query.value, continuation.value);
+    const res = await commands.search(
+      query.value,
+      continuation.value,
+      searchTypeParam(),
+      sortParam(),
+      null,
+    );
     if (res.status === "ok") {
       if (res.data.videos && res.data.videos.length > 0) {
         videos.value.push(...res.data.videos);
@@ -110,6 +147,10 @@ watch(query, (newQ, oldQ) => {
     loadInitialSearch();
   }
 });
+
+watch([searchType, sort], () => {
+  loadInitialSearch();
+});
 </script>
 
 <template>
@@ -119,6 +160,41 @@ watch(query, (newQ, oldQ) => {
       <h1 class="text-lg font-semibold text-foreground">
         Results for <span class="text-primary font-bold">"{{ query }}"</span>
       </h1>
+    </div>
+
+    <!-- Filters -->
+    <div v-if="query" class="flex flex-wrap items-center gap-2 px-6 pb-3">
+      <button
+        v-for="option in typeOptions"
+        :key="option.value"
+        type="button"
+        class="rounded-full border px-3 py-1 text-xs font-medium transition-colors cursor-pointer"
+        :class="
+          searchType === option.value
+            ? 'border-foreground bg-foreground text-background'
+            : 'border-border text-muted-foreground hover:bg-muted'
+        "
+        @click="searchType = option.value"
+      >
+        {{ option.label }}
+      </button>
+
+      <span class="mx-1 h-4 w-px bg-border" />
+
+      <button
+        v-for="option in sortOptions"
+        :key="option.value"
+        type="button"
+        class="rounded-full border px-3 py-1 text-xs font-medium transition-colors cursor-pointer"
+        :class="
+          sort === option.value
+            ? 'border-foreground bg-foreground text-background'
+            : 'border-border text-muted-foreground hover:bg-muted'
+        "
+        @click="sort = option.value"
+      >
+        {{ option.label }}
+      </button>
     </div>
 
     <!-- Empty State -->

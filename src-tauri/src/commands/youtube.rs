@@ -3,9 +3,9 @@ use tauri::State;
 
 use crate::error::AppError;
 use crate::models::youtube::{
-    AudioStreamInfo, BrowseFeed, HomeFeed, PlayerResponse, PlaylistContinuationResult,
-    PlaylistDetailView, SearchResults, SearchSuggestionItem, TrendingFeed, VideoItem,
-    WatchNextResults,
+    AudioStreamInfo, BrowseFeed, ChannelPage, CommentsPage, HomeFeed, PlayerResponse,
+    PlaylistContinuationResult, PlaylistDetailView, SearchResults, SearchSuggestionItem,
+    TrendingFeed, VideoItem, WatchNextResults,
 };
 use crate::services::youtube::CurrentUserProfile;
 use crate::state::AppState;
@@ -41,8 +41,20 @@ pub async fn search(
     state: State<'_, AppState>,
     query: String,
     continuation: Option<String>,
+    search_type: Option<String>,
+    sort: Option<String>,
+    upload_date: Option<String>,
 ) -> Result<SearchResults, AppError> {
-    let res = state.yt.search(&query, continuation.as_deref()).await?;
+    let res = state
+        .yt
+        .search_filtered(
+            &query,
+            continuation.as_deref(),
+            search_type.as_deref(),
+            sort.as_deref(),
+            upload_date.as_deref(),
+        )
+        .await?;
     Ok(res.into())
 }
 
@@ -148,6 +160,48 @@ pub async fn update_watch_time(
 #[app_command]
 pub async fn get_history(state: State<'_, AppState>) -> Result<Vec<VideoItem>, AppError> {
     state.yt.get_history().await
+}
+
+/// One page of comments for a video.
+#[app_command]
+pub async fn get_comments(
+    state: State<'_, AppState>,
+    video_id: String,
+    continuation: Option<String>,
+) -> Result<CommentsPage, AppError> {
+    state
+        .yt
+        .get_comments(&video_id, continuation.as_deref())
+        .await
+}
+
+/// Channel header and its Videos tab.
+#[app_command]
+pub async fn get_channel_page(
+    state: State<'_, AppState>,
+    channel_id: String,
+) -> Result<ChannelPage, AppError> {
+    state.yt.get_channel_page(&channel_id).await
+}
+
+/// Like / dislike / clear a rating ("like" | "dislike" | "none").
+#[app_command]
+pub async fn rate_video(
+    state: State<'_, AppState>,
+    video_id: String,
+    rating: String,
+) -> Result<(), AppError> {
+    state.yt.rate_video(&video_id, &rating).await
+}
+
+/// Subscribe to or unsubscribe from a channel.
+#[app_command]
+pub async fn set_subscription(
+    state: State<'_, AppState>,
+    channel_id: String,
+    subscribed: bool,
+) -> Result<(), AppError> {
+    state.yt.set_subscription(&channel_id, subscribed).await
 }
 
 #[app_command]

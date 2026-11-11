@@ -1,15 +1,83 @@
 <script setup lang="ts">
-import { onActivated, onMounted, ref } from "vue";
-import { History } from "@lucide/vue";
-import { commands, type VideoItem } from "@/bindings";
+import { computed, onActivated, onMounted, ref } from "vue";
+import { useRoute, useRouter } from "vue-router";
+import { Clock, Heart, History } from "@lucide/vue";
+import { commands, type VideoItem_Deserialize } from "@/bindings";
 import VideoGrid from "@/components/video/VideoGrid.vue";
+import { useLibrary } from "@/composables/useLibrary";
 
 defineOptions({ name: "HistoryPage" });
 
-const videos = ref<VideoItem[]>([]);
+type LibraryTab = "history" | "watch-later" | "liked";
+
+const route = useRoute();
+const router = useRouter();
+const library = useLibrary();
+
+const videos = ref<VideoItem_Deserialize[]>([]);
 const isLoading = ref(false);
 const errorMessage = ref<string | null>(null);
 let activatedOnce = false;
+
+const tab = computed<LibraryTab>(() => {
+  const value = route.query.tab;
+  return value === "watch-later" || value === "liked" ? value : "history";
+});
+
+const tabs: { value: LibraryTab; label: string; icon: typeof History }[] = [
+  { value: "history", label: "History", icon: History },
+  { value: "watch-later", label: "Watch later", icon: Clock },
+  { value: "liked", label: "Liked", icon: Heart },
+];
+
+const heading = computed(() => {
+  switch (tab.value) {
+    case "watch-later":
+      return "Watch later";
+    case "liked":
+      return "Liked videos";
+    default:
+      return "History";
+  }
+});
+
+function savedToVideo(saved: {
+  id: string;
+  title: string;
+  thumbnailUrl: string;
+  channelName: string;
+  duration: string;
+}): VideoItem_Deserialize {
+  return {
+    id: saved.id,
+    title: saved.title,
+    thumbnailUrl: saved.thumbnailUrl,
+    duration: saved.duration,
+    channelName: saved.channelName,
+    channelAvatarUrl: "",
+    isVerified: false,
+    isLive: false,
+    viewCount: "",
+    publishedAt: "",
+    playlistId: undefined,
+  };
+}
+
+const displayedVideos = computed<VideoItem_Deserialize[]>(() => {
+  if (tab.value === "watch-later") {
+    return library.watchLater.value.map(savedToVideo);
+  }
+  if (tab.value === "liked") {
+    return library.liked.value.map(savedToVideo);
+  }
+  return videos.value;
+});
+
+const emptyMessage = computed(() => {
+  if (tab.value === "watch-later") return "Videos you save will appear here";
+  if (tab.value === "liked") return "Videos you like will appear here";
+  return "Your watch history will be saved and displayed here";
+});
 
 async function loadHistory(): Promise<void> {
   isLoading.value = true;
@@ -27,6 +95,13 @@ async function loadHistory(): Promise<void> {
   } finally {
     isLoading.value = false;
   }
+}
+
+function selectTab(next: LibraryTab): void {
+  void router.replace({
+    path: "/history",
+    query: next === "history" ? {} : { tab: next },
+  });
 }
 
 onMounted(loadHistory);
@@ -47,18 +122,43 @@ onActivated(() => {
       <div
         class="flex h-10 w-10 items-center justify-center rounded-xl bg-accent text-accent-foreground"
       >
-        <History class="h-6 w-6" />
+        <component :is="tabs.find((entry) => entry.value === tab)?.icon" class="h-6 w-6" />
       </div>
       <div>
-        <h1 class="text-xl font-bold text-foreground">History</h1>
+        <h1 class="text-xl font-bold text-foreground">{{ heading }}</h1>
         <p class="text-xs text-muted-foreground">
-          Videos you have previously watched
+          {{
+            tab === "history"
+              ? "Videos you have previously watched"
+              : tab === "watch-later"
+                ? "Saved for later, stored on this device"
+                : "Videos you liked, stored on this device"
+          }}
         </p>
       </div>
     </header>
 
+    <!-- Tabs -->
+    <div class="flex items-center gap-1 px-6">
+      <button
+        v-for="entry in tabs"
+        :key="entry.value"
+        type="button"
+        class="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer"
+        :class="
+          tab === entry.value
+            ? 'bg-foreground text-background'
+            : 'text-muted-foreground hover:bg-muted'
+        "
+        @click="selectTab(entry.value)"
+      >
+        <component :is="entry.icon" class="h-3.5 w-3.5" />
+        {{ entry.label }}
+      </button>
+    </div>
+
     <div
-      v-if="errorMessage"
+      v-if="tab === 'history' && errorMessage"
       class="mx-6 mt-4 flex flex-col items-center gap-3 rounded-xl border border-border p-10 text-center"
     >
       <p class="text-sm text-muted-foreground">{{ errorMessage }}</p>
@@ -68,12 +168,16 @@ onActivated(() => {
     </div>
 
     <div
-      v-else-if="!isLoading && videos.length === 0"
+      v-else-if="!isLoading && displayedVideos.length === 0"
       class="mx-6 mt-4 rounded-xl border border-dashed border-border p-12 text-center text-sm text-muted-foreground"
     >
-      Your watch history will be saved and displayed here
+      {{ emptyMessage }}
     </div>
 
-    <VideoGrid v-else :videos="videos" :loading="isLoading" />
+    <VideoGrid
+      v-else
+      :videos="displayedVideos"
+      :loading="tab === 'history' && isLoading"
+    />
   </div>
 </template>

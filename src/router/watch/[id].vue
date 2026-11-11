@@ -5,7 +5,10 @@ import { usePlayer } from "@/composables/usePlayer";
 import { useAudioPlayer } from "@/composables/useAudioPlayer";
 import { useSettings } from "@/composables/useSettings";
 import { useVideoPage, resumeFromQuery } from "@/composables/useVideoPage";
+import { useLibrary } from "@/composables/useLibrary";
+import { commands } from "@/bindings";
 import WatchPlaylistQueue from "@/components/playlist/WatchPlaylistQueue.vue";
+import CommentsSection from "@/components/watch/CommentsSection.vue";
 import {
   ThumbsUp,
   Share2,
@@ -54,6 +57,7 @@ const isDescriptionExpanded = ref(false);
 const watchSlotRef = ref<HTMLDivElement | null>(null);
 
 function startPlayback(id: string): void {
+  const resumeAt = resumeFromQuery(route.query);
   if (!id) return;
 
   // The player may already be showing this video (returning from the mini
@@ -69,12 +73,85 @@ function startPlayback(id: string): void {
     // session back to the video engine before loading.
     audio.stopAudio();
     void player.loadVideo(id, {
-      resumeAt: resumeFromQuery(route.query),
+      resumeAt: resumeAt > 0 ? resumeAt : undefined,
       autoplay: true,
     });
   }
 
   void loadWatchNext();
+}
+
+const library = useLibrary();
+const likeBusy = ref(false);
+const subscribeBusy = ref(false);
+const shareCopied = ref(false);
+
+const isLiked = computed(() => library.isLiked(videoId.value));
+const isSaved = computed(() => library.isSaved(videoId.value));
+const channelId = computed(() => player.currentVideo.value?.channelId ?? "");
+const isSubscribed = computed(() =>
+  channelId.value ? library.isSubscribedChannel(channelId.value) : false,
+);
+
+function libraryVideo() {
+  const meta = player.currentVideo.value;
+  return {
+    id: videoId.value,
+    title: meta?.title ?? "",
+    thumbnailUrl: meta?.thumbnailUrl ?? "",
+    channelName: meta?.channelName ?? "",
+    duration: meta?.duration ?? 0,
+  };
+}
+
+async function toggleLike(): Promise<void> {
+  if (likeBusy.value || !videoId.value) return;
+  likeBusy.value = true;
+  const next = !isLiked.value;
+  try {
+    const res = await commands.rateVideo(videoId.value, next ? "like" : "none");
+    if (res.status === "ok") library.toggleLike(libraryVideo());
+  } catch (err) {
+    console.warn("Failed to rate video:", err);
+  } finally {
+    likeBusy.value = false;
+  }
+}
+
+function toggleSave(): void {
+  if (videoId.value) library.toggleSave(libraryVideo());
+}
+
+async function toggleSubscribe(): Promise<void> {
+  const id = channelId.value;
+  if (!id || subscribeBusy.value) return;
+  subscribeBusy.value = true;
+  const next = !isSubscribed.value;
+  try {
+    const res = await commands.setSubscription(id, next);
+    if (res.status === "ok") library.setSubscribedChannel(id, next);
+  } catch (err) {
+    console.warn("Failed to update subscription:", err);
+  } finally {
+    subscribeBusy.value = false;
+  }
+}
+
+async function shareVideo(): Promise<void> {
+  const url = `https://www.youtube.com/watch?v=${videoId.value}`;
+  try {
+    await navigator.clipboard.writeText(url);
+    shareCopied.value = true;
+    setTimeout(() => {
+      shareCopied.value = false;
+    }, 1500);
+  } catch (err) {
+    console.warn("Could not copy the link:", err);
+  }
+}
+
+function openChannel(): void {
+  if (channelId.value) void router.push(`/channel/${channelId.value}`);
 }
 
 onMounted(() => {
@@ -166,9 +243,13 @@ watch(
             }}
           </div>
 
-          <div>
+          <div
+            class="cursor-pointer"
+            :title="channelId ? 'Open channel' : undefined"
+            @click="openChannel"
+          >
             <div
-              class="flex items-center gap-1 font-semibold text-sm text-foreground"
+              class="flex items-center gap-1 font-semibold text-sm text-foreground hover:text-primary"
             >
               <span>{{
                 player.currentVideo.value?.channelName ||
@@ -188,9 +269,16 @@ watch(
           </div>
 
           <Button
-            class="ml-3 rounded-full bg-foreground text-background hover:bg-foreground/90 font-medium px-4 h-9 text-xs"
+            class="ml-3 h-9 rounded-full px-4 text-xs font-medium disabled:opacity-50"
+            :class="
+              isSubscribed
+                ? 'bg-muted text-foreground hover:bg-muted/70'
+                : 'bg-foreground text-background hover:bg-foreground/90'
+            "
+            :disabled="!channelId || subscribeBusy"
+            @click="toggleSubscribe"
           >
-            Subscribe
+            {{ isSubscribed ? "Subscribed" : "Subscribe" }}
           </Button>
         </div>
 
@@ -199,26 +287,32 @@ watch(
           <Button
             variant="secondary"
             size="sm"
-            class="rounded-full gap-1.5 h-9"
+            class="h-9 gap-1.5 rounded-full"
+            :class="isLiked ? 'text-primary' : ''"
+            :disabled="likeBusy"
+            @click="toggleLike"
           >
-            <ThumbsUp class="h-4 w-4" />
-            <span>Like</span>
+            <ThumbsUp class="h-4 w-4" :class="isLiked ? 'fill-current' : ''" />
+            <span>{{ isLiked ? "Liked" : "Like" }}</span>
           </Button>
           <Button
             variant="secondary"
             size="sm"
-            class="rounded-full gap-1.5 h-9"
+            class="h-9 gap-1.5 rounded-full"
+            @click="shareVideo"
           >
             <Share2 class="h-4 w-4" />
-            <span>Share</span>
+            <span>{{ shareCopied ? "Copied" : "Share" }}</span>
           </Button>
           <Button
             variant="secondary"
             size="sm"
-            class="rounded-full gap-1.5 h-9"
+            class="h-9 gap-1.5 rounded-full"
+            :class="isSaved ? 'text-primary' : ''"
+            @click="toggleSave"
           >
-            <Bookmark class="h-4 w-4" />
-            <span>Save</span>
+            <Bookmark class="h-4 w-4" :class="isSaved ? 'fill-current' : ''" />
+            <span>{{ isSaved ? "Saved" : "Save" }}</span>
           </Button>
         </div>
       </div>
@@ -253,6 +347,8 @@ watch(
           <ChevronDown v-else class="h-3.5 w-3.5" />
         </button>
       </div>
+
+      <CommentsSection :video-id="videoId" />
     </div>
 
     <!-- Right Column: Up Next / Related Videos & Playlist Queue -->

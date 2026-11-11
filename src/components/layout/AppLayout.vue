@@ -1,14 +1,24 @@
 <script setup lang="ts">
 import { useRoute } from "vue-router";
-import { computed, onMounted, onBeforeUnmount } from "vue";
+import { computed, defineAsyncComponent, onMounted, onBeforeUnmount } from "vue";
 import { previousPath } from "@/router";
 import AppTitleBar from "@/components/layout/AppTitleBar.vue";
 import PlaybackModeOsd from "@/components/layout/PlaybackModeOsd.vue";
-import GlobalVideoPlayer from "@/components/player/GlobalVideoPlayer.vue";
 import GlobalAudioPlayer from "@/components/audio/GlobalAudioPlayer.vue";
 import { useMiniPlayerDraggable } from "@/composables/useMiniPlayerDraggable";
+import { usePlayer } from "@/composables/usePlayer";
+import { useMediaSession } from "@/composables/useMediaSession";
+
+// The video player (Video.js + hls.js) is the heaviest dependency in the app;
+// loading it on demand keeps it out of the startup bundle.
+const GlobalVideoPlayer = defineAsyncComponent(
+  () => import("@/components/player/GlobalVideoPlayer.vue"),
+);
 
 const route = useRoute();
+const player = usePlayer();
+
+useMediaSession();
 
 const shouldHideSidebar = computed(() => Boolean(route.meta.hideSidebar));
 const shouldHideHeader = computed(() => Boolean(route.meta.hideHeader));
@@ -68,7 +78,7 @@ onBeforeUnmount(() => {
         :class="{ 'bottom-5 right-5': !position }"
         :style="hostStyle"
       >
-        <GlobalVideoPlayer />
+        <GlobalVideoPlayer v-if="player.isOpen.value" />
       </div>
 
       <!-- Audio-only engine: lives outside the router view so a track keeps

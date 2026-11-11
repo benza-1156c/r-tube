@@ -5,13 +5,10 @@ import {
   Compass,
   Flame,
   CirclePlay,
-  SquarePlay,
   History,
   Clock,
   Heart,
-  Radio,
   Settings,
-  AlertCircle,
 } from "@lucide/vue";
 import { commands } from "@/bindings";
 
@@ -34,10 +31,9 @@ const mainItems = [
 ];
 
 const libraryItems = [
-  { title: "Library", path: "/history", icon: SquarePlay },
   { title: "History", path: "/history", icon: History },
   { title: "Watch later", path: "/history?tab=watch-later", icon: Clock },
-  { title: "Likes videos", path: "/history?tab=liked", icon: Heart },
+  { title: "Liked videos", path: "/history?tab=liked", icon: Heart },
 ];
 
 interface ChannelItem {
@@ -88,10 +84,7 @@ onMounted(() => {
 });
 
 // ── 4. More from YouTube Section ──
-const moreItems = [
-  { title: "Settings", path: "/settings", icon: Settings },
-  { title: "Send feedback", path: "#feedback", icon: AlertCircle },
-];
+const moreItems = [{ title: "Settings", path: "/settings", icon: Settings }];
 </script>
 
 <template>

@@ -18,6 +18,7 @@ import type {
   PlayerStatus,
 } from "./playerState";
 import { fetchUpNext } from "./useUpNext";
+import { useLibrary } from "./useLibrary";
 
 export type { CaptionOption, CurrentVideoMeta, PlayerStatus };
 
@@ -58,6 +59,7 @@ function revokeBlobUrls(): void {
 
 export function usePlayer() {
   const { settings, updateSettings } = useSettings();
+  const library = useLibrary();
   const isPlaying = computed<boolean>(() => state.status.value === "playing");
 
   /** Apply the resolved default quality once the element knows its renditions. */
@@ -245,6 +247,7 @@ export function usePlayer() {
         id: info.id || videoId,
         title: info.title || state.currentVideo.value?.title || "",
         channelName: info.channelName || state.currentVideo.value?.channelName || "",
+        channelId: info.channelId || state.currentVideo.value?.channelId,
         channelAvatarUrl: state.currentVideo.value?.channelAvatarUrl || "",
         thumbnailUrl: info.thumbnailUrl || state.currentVideo.value?.thumbnailUrl || "",
         duration: Number(info.lengthSeconds) || state.currentVideo.value?.duration || 0,
@@ -342,7 +345,9 @@ export function usePlayer() {
     // engine back has to start from a clean slate.
     state.captionTracks.value = [];
 
-    await loadStream(videoId, options);
+    // A hand-off position wins; otherwise resume where this video stopped.
+    const resumeAt = options.resumeAt ?? library.getResume(videoId);
+    await loadStream(videoId, { ...options, resumeAt });
   }
 
   /**
@@ -397,6 +402,12 @@ export function usePlayer() {
       state.status.value = "paused";
     }
     reportPlaybackTime();
+
+    const video = state.currentVideo.value;
+    const element = videoElement.value;
+    if (video && element) {
+      library.setResume(video.id, element.currentTime, video.duration);
+    }
   }
 
   function onTimeUpdate(e: Event): void {
@@ -434,6 +445,10 @@ export function usePlayer() {
 
     state.status.value = "ended";
     reportPlaybackTime();
+
+    const finishedId = state.currentVideo.value?.id;
+    if (finishedId) library.clearResume(finishedId);
+
     if (!state.isAutoplayEnabled.value) return;
 
     // The page normally resolved the queue, but a Mix must keep playing even
@@ -523,8 +538,31 @@ export function usePlayer() {
     void updateSettings({ volume });
   }
 
-  function toggleMute(): void {
-    const el = state.activeMedia.value;
+  /** Picture-in-picture for the video element (no-op for audio). */
+  async function togglePictureInPicture(): Promise<void> {
+    // Video.js renders the real <video> inside its custom element; prefer it
+    // when the wrapper does not expose the PiP API itself.
+    const wrapper = videoElement.value as unknown as HTMLVideoElement | null;
+    const inner = document.querySelector(".rt-player video") as
+      | HTMLVideoElement
+      | null;
+    const el =
+      wrapper && typeof wrapper.requestPictureInPicture === "function"
+        ? wrapper
+        : inner;
+    if (!el) return;
+    try {
+      if (document.pictureInPictureElement) {
+        await document.exitPictureInPicture();
+      } else {
+        await el.requestPictureInPicture();
+      }
+    } catch (err) {
+      console.warn("Picture-in-picture failed:", err);
+    }
+  }
+
+  function toggleMute(): void {    const el = state.activeMedia.value;
     if (!el) return;
     if (el.muted || el.volume === 0) {
       el.muted = false;
@@ -542,6 +580,10 @@ export function usePlayer() {
    */
   async function releaseVideoEngine(): Promise<void> {
     const el = videoElement.value;
+    const video = state.currentVideo.value;
+    if (el && video) {
+      library.setResume(video.id, el.currentTime, video.duration);
+    }
     if (el) {
       try {
         el.pause();
@@ -563,6 +605,14 @@ export function usePlayer() {
    * Close the player and release everything the stream holds.
    */
   function closePlayer(): void {
+    // Capture the session before its state is cleared, so the resume position
+    // can be saved.
+    const closing = state.currentVideo.value;
+    const closingElement = videoElement.value;
+    if (closing && closingElement) {
+      library.setResume(closing.id, closingElement.currentTime, closing.duration);
+    }
+
     cancelAutoplay();
     state.upNextVideo.value = null;
     loadToken++;
@@ -638,6 +688,7 @@ export function usePlayer() {
     seek,
     setVolume,
     toggleMute,
+    togglePictureInPicture,
     closePlayer,
     releaseVideoEngine,
     minimizeToMiniPlayer,

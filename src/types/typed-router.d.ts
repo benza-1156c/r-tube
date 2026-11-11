@@ -30,6 +30,13 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/channel/[id]': RouteRecordInfo<
+      '/channel/[id]',
+      '/channel/:id',
+      { id: ParamValue<true> },
+      { id: ParamValue<false> },
+      | never
+    >,
     '/history/': RouteRecordInfo<
       '/history/',
       '/history',
@@ -49,6 +56,13 @@ declare module 'vue-router/auto-routes' {
       '/login',
       Record<never, never>,
       Record<never, never>,
+      | never
+    >,
+    '/playlist/[id]': RouteRecordInfo<
+      '/playlist/[id]',
+      '/playlist/:id',
+      { id: ParamValue<true> },
+      { id: ParamValue<false> },
       | never
     >,
     '/results/': RouteRecordInfo<
@@ -112,6 +126,12 @@ declare module 'vue-router/auto-routes' {
       views:
         | never
     }
+    'src/router/channel/[id].vue': {
+      routes:
+        | '/channel/[id]'
+      views:
+        | never
+    }
     'src/router/history/index.vue': {
       routes:
         | '/history/'
@@ -127,6 +147,12 @@ declare module 'vue-router/auto-routes' {
     'src/router/login/index.vue': {
       routes:
         | '/login/'
+      views:
+        | never
+    }
+    'src/router/playlist/[id].vue': {
+      routes:
+        | '/playlist/[id]'
       views:
         | never
     }

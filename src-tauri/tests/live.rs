@@ -162,3 +162,37 @@ async fn playback_contract() {
     assert_audio_range(&client, &video_id).await;
     assert_hls_proxy(&client, &video_id).await;
 }
+
+/// Comments and the channel page are fetched through the same signed client.
+#[tokio::test]
+async fn comments_and_channel() {
+    let client = YoutubeClient::new().await.expect("Failed to create client");
+    let video_id = probe_video_id();
+
+    let info = client
+        .get_video_info(&video_id)
+        .await
+        .expect("Failed to get video info");
+    let channel_id = info.channel_id.clone();
+    assert!(!channel_id.is_empty(), "expected a channel id");
+
+    let comments = client
+        .get_comments(&video_id, None)
+        .await
+        .expect("Failed to fetch comments");
+    eprintln!(
+        "comments: total={:?} page={}",
+        comments.total,
+        comments.comments.len()
+    );
+
+    let channel = client
+        .get_channel_page(&channel_id)
+        .await
+        .expect("Failed to fetch channel");
+    eprintln!(
+        "channel: {:?} videos={}",
+        channel.info.name,
+        channel.videos.len()
+    );
+}

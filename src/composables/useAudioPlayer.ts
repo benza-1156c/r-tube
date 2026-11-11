@@ -2,6 +2,7 @@ import { shallowRef } from "vue";
 import { commands } from "@/bindings";
 import { router } from "@/router";
 import { useSettings } from "./useSettings";
+import { useLibrary } from "./useLibrary";
 import { usePlayer } from "./usePlayer";
 import { fetchUpNext } from "./useUpNext";
 import * as state from "./playerState";
@@ -31,6 +32,7 @@ let nextTimer: ReturnType<typeof setTimeout> | null = null;
 
 export function useAudioPlayer() {
   const { settings, updateSettings } = useSettings();
+  const library = useLibrary();
   const player = usePlayer();
 
   function clearNextTimer(): void {
@@ -85,6 +87,11 @@ export function useAudioPlayer() {
       }
       state.status.value = "paused";
       reportPlaybackTime();
+
+      const video = state.currentVideo.value;
+      if (video) {
+        library.setResume(video.id, el.currentTime, video.duration);
+      }
     });
 
     el.addEventListener("timeupdate", () => {
@@ -135,6 +142,9 @@ export function useAudioPlayer() {
     state.status.value = "ended";
     reportPlaybackTime();
 
+    const finishedId = state.currentVideo.value?.id;
+    if (finishedId) library.clearResume(finishedId);
+
     if (!state.isAutoplayEnabled.value) return;
 
     // Re-resolve the queue when the page did not manage to (or lost) it.
@@ -178,6 +188,8 @@ export function useAudioPlayer() {
   ): Promise<void> {
     const token = ++loadToken;
     const isStale = (): boolean => token !== loadToken;
+    // A hand-off position wins; otherwise resume where this track stopped.
+    const resumeAt = options.resumeAt ?? library.getResume(videoId);
 
     clearNextTimer();
     state.activeEngine.value = "audio";
@@ -186,7 +198,7 @@ export function useAudioPlayer() {
     state.errorMessage.value = null;
     state.captionTracks.value = [];
     state.upNextVideo.value = null;
-    state.currentTime.value = options.resumeAt ?? 0;
+    state.currentTime.value = resumeAt;
     state.currentSrc.value = "";
     state.currentVideo.value = {
       id: videoId,
@@ -220,6 +232,7 @@ export function useAudioPlayer() {
       id: videoId,
       title: info.title || "Audio",
       channelName: info.author || "",
+      channelId: info.channelId || undefined,
       channelAvatarUrl: "",
       thumbnailUrl: info.thumbnailUrl || "",
       duration:
@@ -239,8 +252,7 @@ export function useAudioPlayer() {
     state.activeMedia.value = el;
     state.currentSrc.value = info.url;
 
-    pendingSeek =
-      options.resumeAt && options.resumeAt > 0 ? options.resumeAt : null;
+    pendingSeek = resumeAt > 0 ? resumeAt : null;
     autoplayOnLoad = options.autoplay ?? true;
 
     el.src = info.url;
@@ -260,6 +272,16 @@ export function useAudioPlayer() {
     clearNextTimer();
     loadToken++;
     pendingSeek = null;
+
+    const stoppingVideo = state.currentVideo.value;
+    const stoppingElement = audioElement.value;
+    if (stoppingVideo && stoppingElement) {
+      library.setResume(
+        stoppingVideo.id,
+        stoppingElement.currentTime,
+        stoppingVideo.duration,
+      );
+    }
 
     const el = audioElement.value;
     if (el) {

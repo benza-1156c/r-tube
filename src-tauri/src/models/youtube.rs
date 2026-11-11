@@ -128,11 +128,67 @@ pub struct AudioStreamInfo {
     pub language: Option<String>,
     pub title: String,
     pub author: String,
+    pub channel_id: String,
     pub thumbnail_url: String,
     pub length_seconds: String,
     pub description: String,
     pub view_count: String,
     pub is_live: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct VideoComment {
+    pub id: String,
+    pub author: String,
+    pub author_thumbnail: Option<String>,
+    pub author_channel_id: Option<String>,
+    pub text: String,
+    pub likes: Option<String>,
+    pub published_time: Option<String>,
+    pub is_pinned: bool,
+    pub is_owner: bool,
+    pub reply_count: Option<f64>,
+    pub replies: Vec<VideoComment>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct CommentsPage {
+    pub total: Option<String>,
+    pub comments: Vec<VideoComment>,
+    pub continuation: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct ChannelInfo {
+    pub id: String,
+    pub name: String,
+    pub avatar: Option<String>,
+    pub banner: Option<String>,
+    pub subscriber_count: Option<String>,
+    pub video_count: Option<String>,
+    pub description: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct ChannelVideo {
+    pub id: String,
+    pub title: String,
+    pub thumbnail: Option<String>,
+    pub duration: Option<String>,
+    pub published: Option<String>,
+    pub views: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct ChannelPage {
+    pub info: ChannelInfo,
+    pub videos: Vec<ChannelVideo>,
+    pub continuation: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]

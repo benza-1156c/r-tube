@@ -12,17 +12,7 @@ const router = useRouter();
 const { settings } = useSettings();
 
 function openPlaylist() {
-  const videoId =
-    props.playlist.firstVideoId ||
-    props.playlist.id.replace(/^VL/, "").replace(/^RD/, "");
-  const isNormal = settings.value.playbackMode === "normal";
-  const basePath = isNormal ? "/watch" : "/listen";
-  router.push({
-    path: `${basePath}/${videoId}`,
-    query: {
-      list: props.playlist.id,
-    },
-  });
+  router.push(`/playlist/${props.playlist.id}`);
 }
 
 function playAll(e: MouseEvent) {

@@ -16,7 +16,7 @@ export const commands = {
 	getHomeFeed: (continuation: string | null, params: string | null) => typedError<HomeFeed_Serialize, AppError_Serialize>(__TAURI_INVOKE("get_home_feed", { continuation, params })),
 	getSubscriptionsFeed: () => typedError<BrowseFeed_Serialize, AppError_Serialize>(__TAURI_INVOKE("get_subscriptions_feed")),
 	getTrending: () => typedError<TrendingFeed_Serialize, AppError_Serialize>(__TAURI_INVOKE("get_trending")),
-	search: (query: string, continuation: string | null) => typedError<SearchResults_Serialize, AppError_Serialize>(__TAURI_INVOKE("search", { query, continuation })),
+	search: (query: string, continuation: string | null, searchType: string | null, sort: string | null, uploadDate: string | null) => typedError<SearchResults_Serialize, AppError_Serialize>(__TAURI_INVOKE("search", { query, continuation, searchType, sort, uploadDate })),
 	getSearchSuggestions: (query: string) => typedError<SearchSuggestionItem_Serialize[], AppError_Serialize>(__TAURI_INVOKE("get_search_suggestions", { query })),
 	getPlaylist: (playlistId: string) => typedError<PlaylistDetailView_Serialize, AppError_Serialize>(__TAURI_INVOKE("get_playlist", { playlistId })),
 	getPlaylistContinuation: (continuation: string) => typedError<PlaylistContinuationResult_Serialize, AppError_Serialize>(__TAURI_INVOKE("get_playlist_continuation", { continuation })),
@@ -36,6 +36,14 @@ export const commands = {
 	updateWatchTime: (videoId: string, seconds: number | null) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("update_watch_time", { videoId, seconds })),
 	/**  Watch history of the signed-in account. */
 	getHistory: () => typedError<VideoItem_Serialize[], AppError_Serialize>(__TAURI_INVOKE("get_history")),
+	/**  One page of comments for a video. */
+	getComments: (videoId: string, continuation: string | null) => typedError<CommentsPage_Serialize, AppError_Serialize>(__TAURI_INVOKE("get_comments", { videoId, continuation })),
+	/**  Channel header and its Videos tab. */
+	getChannelPage: (channelId: string) => typedError<ChannelPage_Serialize, AppError_Serialize>(__TAURI_INVOKE("get_channel_page", { channelId })),
+	/**  Like / dislike / clear a rating ("like" | "dislike" | "none"). */
+	rateVideo: (videoId: string, rating: string) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("rate_video", { videoId, rating })),
+	/**  Subscribe to or unsubscribe from a channel. */
+	setSubscription: (channelId: string, subscribed: boolean) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("set_subscription", { channelId, subscribed })),
 	getSubtitleContent: (url: string) => typedError<string, AppError_Serialize>(__TAURI_INVOKE("get_subtitle_content", { url })),
 };
 
@@ -91,6 +99,7 @@ export type AudioStreamInfo_Deserialize = {
 	language?: string | null,
 	title: string,
 	author: string,
+	channelId: string,
 	thumbnailUrl: string,
 	lengthSeconds: string,
 	description: string,
@@ -114,6 +123,7 @@ export type AudioStreamInfo_Serialize = {
 	language: string | null,
 	title: string,
 	author: string,
+	channelId: string,
 	thumbnailUrl: string,
 	lengthSeconds: string,
 	description: string,
@@ -141,6 +151,76 @@ export type CaptionTrack = {
 	languageCode: string,
 	name: string,
 	vttUrl: string,
+};
+
+export type ChannelInfo = ChannelInfo_Serialize | ChannelInfo_Deserialize;
+
+export type ChannelInfo_Deserialize = {
+	id: string,
+	name: string,
+	avatar?: string | null,
+	banner?: string | null,
+	subscriberCount?: string | null,
+	videoCount?: string | null,
+	description?: string | null,
+};
+
+export type ChannelInfo_Serialize = {
+	id: string,
+	name: string,
+	avatar: string | null,
+	banner: string | null,
+	subscriberCount: string | null,
+	videoCount: string | null,
+	description: string | null,
+};
+
+export type ChannelPage = ChannelPage_Serialize | ChannelPage_Deserialize;
+
+export type ChannelPage_Deserialize = {
+	info: ChannelInfo_Deserialize,
+	videos: ChannelVideo_Deserialize[],
+	continuation?: string | null,
+};
+
+export type ChannelPage_Serialize = {
+	info: ChannelInfo_Serialize,
+	videos: ChannelVideo_Serialize[],
+	continuation: string | null,
+};
+
+export type ChannelVideo = ChannelVideo_Serialize | ChannelVideo_Deserialize;
+
+export type ChannelVideo_Deserialize = {
+	id: string,
+	title: string,
+	thumbnail?: string | null,
+	duration?: string | null,
+	published?: string | null,
+	views?: string | null,
+};
+
+export type ChannelVideo_Serialize = {
+	id: string,
+	title: string,
+	thumbnail: string | null,
+	duration: string | null,
+	published: string | null,
+	views: string | null,
+};
+
+export type CommentsPage = CommentsPage_Serialize | CommentsPage_Deserialize;
+
+export type CommentsPage_Deserialize = {
+	total?: string | null,
+	comments: VideoComment_Deserialize[],
+	continuation?: string | null,
+};
+
+export type CommentsPage_Serialize = {
+	total: string | null,
+	comments: VideoComment_Serialize[],
+	continuation: string | null,
 };
 
 export type CurrentUserProfile = CurrentUserProfile_Serialize | CurrentUserProfile_Deserialize;
@@ -408,6 +488,36 @@ export type TrendingFeed_Deserialize = {
 export type TrendingFeed_Serialize = {
 	currentTab: string,
 	videos: VideoItem_Serialize[],
+};
+
+export type VideoComment = VideoComment_Serialize | VideoComment_Deserialize;
+
+export type VideoComment_Deserialize = {
+	id: string,
+	author: string,
+	authorThumbnail?: string | null,
+	authorChannelId?: string | null,
+	text: string,
+	likes?: string | null,
+	publishedTime?: string | null,
+	isPinned: boolean,
+	isOwner: boolean,
+	replyCount?: number | null,
+	replies: VideoComment_Deserialize[],
+};
+
+export type VideoComment_Serialize = {
+	id: string,
+	author: string,
+	authorThumbnail: string | null,
+	authorChannelId: string | null,
+	text: string,
+	likes: string | null,
+	publishedTime: string | null,
+	isPinned: boolean,
+	isOwner: boolean,
+	replyCount: number | null,
+	replies: VideoComment_Serialize[],
 };
 
 export type VideoItem = VideoItem_Serialize | VideoItem_Deserialize;
