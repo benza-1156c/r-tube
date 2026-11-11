@@ -18,7 +18,10 @@ export default defineConfig(() => ({
       extensions: [".vue"],
       dts: "src/types/typed-router.d.ts",
       extendRoute(route) {
-        if (route.path.startsWith("/watch")) {
+        if (
+          route.path.startsWith("/watch") ||
+          route.path.startsWith("/listen")
+        ) {
           route.addToMeta({ hideSidebar: true });
         }
       },

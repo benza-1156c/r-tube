@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { useRouter } from "vue-router";
+import { useRouter, useRoute } from "vue-router";
 import { usePlayer } from "@/composables/usePlayer";
+import { useSettings } from "@/composables/useSettings";
 import { useControlsHold } from "./useControlsHold";
 import { usePlayerStage } from "./usePlayerStage";
 import PlayerSkin from "./PlayerSkin.vue";
@@ -12,10 +13,15 @@ import AutoplayNextOverlay from "./AutoplayNextOverlay.vue";
 defineOptions({ name: "GlobalVideoPlayer" });
 
 const router = useRouter();
+const route = useRoute();
 const player = usePlayer();
+const { settings } = useSettings();
 
 const rootRef = ref<HTMLElement | null>(null);
 const stageRef = ref<HTMLElement | null>(null);
+
+const isListenPage = computed(() => route.path.startsWith("/listen"));
+const isAudioOnly = computed(() => settings.value.playbackMode !== "normal");
 
 /**
  * Mini mode is "the player is not docked in a page": either the user
@@ -38,7 +44,11 @@ function expandToWatch(): void {
   player.restoreFromMiniPlayer();
   const videoId = player.currentVideo.value?.id;
   if (videoId) {
-    router.push(`/watch/${videoId}`);
+    if (settings.value.playbackMode === "normal") {
+      router.push(`/watch/${videoId}`);
+    } else {
+      router.push(`/listen/${videoId}`);
+    }
   }
 }
 </script>
@@ -56,13 +66,21 @@ function expandToWatch(): void {
       id="global-player-root"
       ref="rootRef"
       class="rt-player select-none bg-black"
-      :class="
-        isMini
-          ? 'rt-player--mini pointer-events-auto w-full shadow-2xl ring-1 ring-border'
-          : 'w-full h-full'
-      "
+      :class="[
+        isListenPage
+          ? 'fixed -left-[9999px] -top-[9999px] w-1 h-1 opacity-0 pointer-events-none overflow-hidden'
+          : isMini
+            ? 'rt-player--mini pointer-events-auto w-full shadow-2xl ring-1 ring-border'
+            : 'w-full h-full',
+      ]"
     >
-      <div class="rt-player__frame aspect-video w-full">
+      <div
+        class="rt-player__frame aspect-video w-full"
+        :class="{
+          'sr-only opacity-0 h-0 aspect-auto overflow-hidden pointer-events-none':
+            isMini && isAudioOnly,
+        }"
+      >
         <PlayerSkin>
           <WatchPlayerChrome v-if="!isMini" />
         </PlayerSkin>
@@ -82,7 +100,7 @@ function expandToWatch(): void {
 
       <!-- Mini chrome lives below the video: the video itself is Video.js'. -->
       <MiniPlayerBar
-        v-if="isMini"
+        v-if="isMini && !isListenPage"
         @expand="expandToWatch"
         @close="player.closePlayer"
       />

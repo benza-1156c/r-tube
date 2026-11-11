@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useRouter } from "vue-router";
+import { useSettings } from "@/composables/useSettings";
 import { Play, ListMusic } from "@lucide/vue";
 import type { PlaylistItem } from "@/bindings";
 
@@ -8,13 +9,16 @@ const props = defineProps<{
 }>();
 
 const router = useRouter();
+const { settings } = useSettings();
 
 function openPlaylist() {
   const videoId =
     props.playlist.firstVideoId ||
     props.playlist.id.replace(/^VL/, "").replace(/^RD/, "");
+  const isNormal = settings.value.playbackMode === "normal";
+  const basePath = isNormal ? "/watch" : "/listen";
   router.push({
-    path: `/watch/${videoId}`,
+    path: `${basePath}/${videoId}`,
     query: {
       list: props.playlist.id,
     },
@@ -26,8 +30,10 @@ function playAll(e: MouseEvent) {
   const videoId =
     props.playlist.firstVideoId ||
     props.playlist.id.replace(/^VL/, "").replace(/^RD/, "");
+  const isNormal = settings.value.playbackMode === "normal";
+  const basePath = isNormal ? "/watch" : "/listen";
   router.push({
-    path: `/watch/${videoId}`,
+    path: `${basePath}/${videoId}`,
     query: {
       list: props.playlist.id,
     },

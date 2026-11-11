@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { useRouter, useRoute } from "vue-router";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { AudioLines, Clapperboard } from "@lucide/vue";
 import WindowControls from "@/components/layout/WindowControls.vue";
 import { useSettings, type PlaybackMode } from "@/composables/useSettings";
 import { usePlaybackModeNotice } from "@/composables/usePlaybackModeNotice";
 
+const router = useRouter();
+const route = useRoute();
 const { settings, updateSettings } = useSettings();
 const { notifyPlaybackMode } = usePlaybackModeNotice();
 
@@ -37,6 +40,24 @@ function setPlaybackMode(mode: PlaybackMode): void {
   // from where the user is looking.
   notifyPlaybackMode(mode);
   void updateSettings({ playbackMode: mode });
+
+  const currentPath = route.path;
+  const currentId = (route.params as Record<string, any>)?.id as
+    | string
+    | undefined;
+  if (currentId) {
+    if (mode === "audio-only" && currentPath.startsWith("/watch/")) {
+      router.push({
+        path: `/listen/${currentId}`,
+        query: route.query,
+      });
+    } else if (mode === "normal" && currentPath.startsWith("/listen/")) {
+      router.push({
+        path: `/watch/${currentId}`,
+        query: route.query,
+      });
+    }
+  }
 }
 
 const isTauri = () => {

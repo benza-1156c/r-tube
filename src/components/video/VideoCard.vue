@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useRouter } from "vue-router";
+import { useSettings } from "@/composables/useSettings";
 import { VideoItem } from "@/bindings";
 import { CheckCircle2, Play, ListMusic } from "@lucide/vue";
 
@@ -7,15 +9,18 @@ const props = defineProps<{
 }>();
 
 const router = useRouter();
+const { settings } = useSettings();
 
 function openVideo() {
+  const isNormal = settings.value.playbackMode === "normal";
+  const basePath = isNormal ? "/watch" : "/listen";
   if (props.video.playlistId) {
     router.push({
-      path: `/watch/${props.video.id}`,
+      path: `${basePath}/${props.video.id}`,
       query: { list: props.video.playlistId },
     });
   } else {
-    router.push(`/watch/${props.video.id}`);
+    router.push(`${basePath}/${props.video.id}`);
   }
 }
 </script>

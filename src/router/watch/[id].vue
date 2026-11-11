@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useRoute, useRouter, onBeforeRouteLeave } from "vue-router";
 import { usePlayer } from "@/composables/usePlayer";
+import { useSettings } from "@/composables/useSettings";
 import {
   commands,
   type VideoItem_Deserialize,
@@ -24,6 +25,7 @@ defineOptions({ name: "WatchPage" });
 const route = useRoute();
 const router = useRouter();
 const player = usePlayer();
+const { settings } = useSettings();
 
 const videoId = computed(
   () => ((route.params as Record<string, any>)?.id as string) || "",
@@ -108,6 +110,13 @@ async function loadWatchData(id: string) {
 }
 
 onMounted(() => {
+  if (settings.value.playbackMode !== "normal" && videoId.value) {
+    router.replace({
+      path: `/listen/${videoId.value}`,
+      query: route.query,
+    });
+    return;
+  }
   if (watchSlotRef.value) {
     player.setWatchAnchor(watchSlotRef.value);
   }
@@ -115,6 +124,18 @@ onMounted(() => {
     loadWatchData(videoId.value);
   }
 });
+
+watch(
+  () => settings.value.playbackMode,
+  (mode) => {
+    if (mode !== "normal" && videoId.value) {
+      router.replace({
+        path: `/listen/${videoId.value}`,
+        query: route.query,
+      });
+    }
+  },
+);
 
 onBeforeRouteLeave(() => {
   player.setWatchAnchor(null);
@@ -135,13 +156,15 @@ watch(
 );
 
 function selectRelatedVideo(item: VideoItem_Deserialize) {
+  const isNormal = settings.value.playbackMode === "normal";
+  const basePath = isNormal ? "/watch" : "/listen";
   if (item.playlistId) {
     router.push({
-      path: `/watch/${item.id}`,
+      path: `${basePath}/${item.id}`,
       query: { list: item.playlistId },
     });
   } else {
-    router.push(`/watch/${item.id}`);
+    router.push(`${basePath}/${item.id}`);
   }
 }
 </script>

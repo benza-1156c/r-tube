@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from "vue";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
+import { useSettings } from "@/composables/useSettings";
 import { Play, X, MoreVertical, ListMusic, ChevronDown } from "@lucide/vue";
 import type { PlaylistPanelItem } from "@/bindings";
 
@@ -12,7 +13,9 @@ const props = defineProps<{
 }>();
 
 const isCollapsed = ref(false);
+const route = useRoute();
 const router = useRouter();
+const { settings } = useSettings();
 const activeItemRef = ref<HTMLElement | null>(null);
 
 const isMix = computed(() => {
@@ -55,8 +58,12 @@ function handleCloseButton(e: MouseEvent) {
 function selectVideo(item: PlaylistPanelItem, idx: number) {
   if (item.videoId === props.currentVideoId) return;
 
+  const isListen = route.path.startsWith("/listen");
+  const isNormal = settings.value.playbackMode === "normal";
+  const basePath = isListen || !isNormal ? "/listen" : "/watch";
+
   router.push({
-    path: `/watch/${item.videoId}`,
+    path: `${basePath}/${item.videoId}`,
     query: {
       list: props.playlistId,
       index: String(idx + 1),
