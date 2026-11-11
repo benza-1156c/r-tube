@@ -30,78 +30,78 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
-    '/channel/[id]': RouteRecordInfo<
-      '/channel/[id]',
-      '/channel/:id',
-      { id: ParamValue<true> },
-      { id: ParamValue<false> },
-      | never
-    >,
-    '/history/': RouteRecordInfo<
-      '/history/',
-      '/history',
-      Record<never, never>,
-      Record<never, never>,
-      | never
-    >,
-    '/listen/[id]': RouteRecordInfo<
-      '/listen/[id]',
-      '/listen/:id',
-      { id: ParamValue<true> },
-      { id: ParamValue<false> },
-      | never
-    >,
-    '/login/': RouteRecordInfo<
-      '/login/',
+    '/(account)/login/': RouteRecordInfo<
+      '/(account)/login/',
       '/login',
       Record<never, never>,
       Record<never, never>,
       | never
     >,
-    '/playlist/[id]': RouteRecordInfo<
-      '/playlist/[id]',
-      '/playlist/:id',
-      { id: ParamValue<true> },
-      { id: ParamValue<false> },
-      | never
-    >,
-    '/results/': RouteRecordInfo<
-      '/results/',
-      '/results',
-      Record<never, never>,
-      Record<never, never>,
-      | never
-    >,
-    '/settings/': RouteRecordInfo<
-      '/settings/',
+    '/(account)/settings/': RouteRecordInfo<
+      '/(account)/settings/',
       '/settings',
       Record<never, never>,
       Record<never, never>,
       | never
     >,
-    '/subscriptions/': RouteRecordInfo<
-      '/subscriptions/',
+    '/(browse)/channel/[id]': RouteRecordInfo<
+      '/(browse)/channel/[id]',
+      '/channel/:id',
+      { id: ParamValue<true> },
+      { id: ParamValue<false> },
+      | never
+    >,
+    '/(browse)/playlist/[id]': RouteRecordInfo<
+      '/(browse)/playlist/[id]',
+      '/playlist/:id',
+      { id: ParamValue<true> },
+      { id: ParamValue<false> },
+      | never
+    >,
+    '/(browse)/results/': RouteRecordInfo<
+      '/(browse)/results/',
+      '/results',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
+    '/(browse)/subscriptions/': RouteRecordInfo<
+      '/(browse)/subscriptions/',
       '/subscriptions',
       Record<never, never>,
       Record<never, never>,
       | never
     >,
-    '/subscriptions/[id]': RouteRecordInfo<
-      '/subscriptions/[id]',
+    '/(browse)/subscriptions/[id]': RouteRecordInfo<
+      '/(browse)/subscriptions/[id]',
       '/subscriptions/:id',
       { id: ParamValue<true> },
       { id: ParamValue<false> },
       | never
     >,
-    '/trending/': RouteRecordInfo<
-      '/trending/',
+    '/(browse)/trending/': RouteRecordInfo<
+      '/(browse)/trending/',
       '/trending',
       Record<never, never>,
       Record<never, never>,
       | never
     >,
-    '/watch/[id]': RouteRecordInfo<
-      '/watch/[id]',
+    '/(library)/history/': RouteRecordInfo<
+      '/(library)/history/',
+      '/history',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
+    '/(player)/listen/[id]': RouteRecordInfo<
+      '/(player)/listen/[id]',
+      '/listen/:id',
+      { id: ParamValue<true> },
+      { id: ParamValue<false> },
+      | never
+    >,
+    '/(player)/watch/[id]': RouteRecordInfo<
+      '/(player)/watch/[id]',
       '/watch/:id',
       { id: ParamValue<true> },
       { id: ParamValue<false> },
@@ -126,69 +126,69 @@ declare module 'vue-router/auto-routes' {
       views:
         | never
     }
-    'src/router/channel/[id].vue': {
+    'src/router/(account)/login/index.vue': {
       routes:
-        | '/channel/[id]'
+        | '/(account)/login/'
       views:
         | never
     }
-    'src/router/history/index.vue': {
+    'src/router/(account)/settings/index.vue': {
       routes:
-        | '/history/'
+        | '/(account)/settings/'
       views:
         | never
     }
-    'src/router/listen/[id].vue': {
+    'src/router/(browse)/channel/[id].vue': {
       routes:
-        | '/listen/[id]'
+        | '/(browse)/channel/[id]'
       views:
         | never
     }
-    'src/router/login/index.vue': {
+    'src/router/(browse)/playlist/[id].vue': {
       routes:
-        | '/login/'
+        | '/(browse)/playlist/[id]'
       views:
         | never
     }
-    'src/router/playlist/[id].vue': {
+    'src/router/(browse)/results/index.vue': {
       routes:
-        | '/playlist/[id]'
+        | '/(browse)/results/'
       views:
         | never
     }
-    'src/router/results/index.vue': {
+    'src/router/(browse)/subscriptions/index.vue': {
       routes:
-        | '/results/'
+        | '/(browse)/subscriptions/'
       views:
         | never
     }
-    'src/router/settings/index.vue': {
+    'src/router/(browse)/subscriptions/[id].vue': {
       routes:
-        | '/settings/'
+        | '/(browse)/subscriptions/[id]'
       views:
         | never
     }
-    'src/router/subscriptions/index.vue': {
+    'src/router/(browse)/trending/index.vue': {
       routes:
-        | '/subscriptions/'
+        | '/(browse)/trending/'
       views:
         | never
     }
-    'src/router/subscriptions/[id].vue': {
+    'src/router/(library)/history/index.vue': {
       routes:
-        | '/subscriptions/[id]'
+        | '/(library)/history/'
       views:
         | never
     }
-    'src/router/trending/index.vue': {
+    'src/router/(player)/listen/[id].vue': {
       routes:
-        | '/trending/'
+        | '/(player)/listen/[id]'
       views:
         | never
     }
-    'src/router/watch/[id].vue': {
+    'src/router/(player)/watch/[id].vue': {
       routes:
-        | '/watch/[id]'
+        | '/(player)/watch/[id]'
       views:
         | never
     }

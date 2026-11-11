@@ -10,6 +10,7 @@ import ListenArtwork from "@/components/listen/ListenArtwork.vue";
 import ListenTrackInfo from "@/components/listen/ListenTrackInfo.vue";
 import ListenControls from "@/components/listen/ListenControls.vue";
 import ListenRelated from "@/components/listen/ListenRelated.vue";
+import ListenCaptions from "@/components/audio/ListenCaptions.vue";
 
 import { ChevronDown, ChevronUp, AlertCircle, Clapperboard } from "@lucide/vue";
 
@@ -228,6 +229,8 @@ function switchToVideo(): void {
           @volume-change="handleVolumeChange"
           @toggle-mute="toggleMute"
         />
+
+        <ListenCaptions />
 
         <!-- Audio-only failure: live streams and unplayable releases still have video. -->
         <div

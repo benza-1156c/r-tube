@@ -134,6 +134,7 @@ pub struct AudioStreamInfo {
     pub description: String,
     pub view_count: String,
     pub is_live: bool,
+    pub captions: Vec<CaptionTrack>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]

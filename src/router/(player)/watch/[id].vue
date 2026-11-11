@@ -5,14 +5,12 @@ import { usePlayer } from "@/composables/usePlayer";
 import { useAudioPlayer } from "@/composables/useAudioPlayer";
 import { useSettings } from "@/composables/useSettings";
 import { useVideoPage, resumeFromQuery } from "@/composables/useVideoPage";
-import { useLibrary } from "@/composables/useLibrary";
 import { commands } from "@/bindings";
 import WatchPlaylistQueue from "@/components/playlist/WatchPlaylistQueue.vue";
 import CommentsSection from "@/components/watch/CommentsSection.vue";
 import {
   ThumbsUp,
   Share2,
-  Bookmark,
   CheckCircle2,
   Loader2,
   ListMusic,
@@ -81,36 +79,23 @@ function startPlayback(id: string): void {
   void loadWatchNext();
 }
 
-const library = useLibrary();
+const liked = ref(false);
+const subscribed = ref(false);
 const likeBusy = ref(false);
 const subscribeBusy = ref(false);
 const shareCopied = ref(false);
 
-const isLiked = computed(() => library.isLiked(videoId.value));
-const isSaved = computed(() => library.isSaved(videoId.value));
 const channelId = computed(() => player.currentVideo.value?.channelId ?? "");
-const isSubscribed = computed(() =>
-  channelId.value ? library.isSubscribedChannel(channelId.value) : false,
-);
-
-function libraryVideo() {
-  const meta = player.currentVideo.value;
-  return {
-    id: videoId.value,
-    title: meta?.title ?? "",
-    thumbnailUrl: meta?.thumbnailUrl ?? "",
-    channelName: meta?.channelName ?? "",
-    duration: meta?.duration ?? 0,
-  };
-}
+const isLiked = computed(() => liked.value);
+const isSubscribed = computed(() => subscribed.value);
 
 async function toggleLike(): Promise<void> {
   if (likeBusy.value || !videoId.value) return;
   likeBusy.value = true;
-  const next = !isLiked.value;
+  const next = !liked.value;
   try {
     const res = await commands.rateVideo(videoId.value, next ? "like" : "none");
-    if (res.status === "ok") library.toggleLike(libraryVideo());
+    if (res.status === "ok") liked.value = next;
   } catch (err) {
     console.warn("Failed to rate video:", err);
   } finally {
@@ -118,18 +103,14 @@ async function toggleLike(): Promise<void> {
   }
 }
 
-function toggleSave(): void {
-  if (videoId.value) library.toggleSave(libraryVideo());
-}
-
 async function toggleSubscribe(): Promise<void> {
   const id = channelId.value;
   if (!id || subscribeBusy.value) return;
   subscribeBusy.value = true;
-  const next = !isSubscribed.value;
+  const next = !subscribed.value;
   try {
     const res = await commands.setSubscription(id, next);
-    if (res.status === "ok") library.setSubscribedChannel(id, next);
+    if (res.status === "ok") subscribed.value = next;
   } catch (err) {
     console.warn("Failed to update subscription:", err);
   } finally {
@@ -303,16 +284,6 @@ watch(
           >
             <Share2 class="h-4 w-4" />
             <span>{{ shareCopied ? "Copied" : "Share" }}</span>
-          </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            class="h-9 gap-1.5 rounded-full"
-            :class="isSaved ? 'text-primary' : ''"
-            @click="toggleSave"
-          >
-            <Bookmark class="h-4 w-4" :class="isSaved ? 'fill-current' : ''" />
-            <span>{{ isSaved ? "Saved" : "Save" }}</span>
           </Button>
         </div>
       </div>

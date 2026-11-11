@@ -105,6 +105,7 @@ export type AudioStreamInfo_Deserialize = {
 	description: string,
 	viewCount: string,
 	isLive: boolean,
+	captions: CaptionTrack[],
 };
 
 /**
@@ -129,6 +130,7 @@ export type AudioStreamInfo_Serialize = {
 	description: string,
 	viewCount: string,
 	isLive: boolean,
+	captions: CaptionTrack[],
 };
 
 export type BrowseFeed = BrowseFeed_Serialize | BrowseFeed_Deserialize;

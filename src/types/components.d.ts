@@ -46,6 +46,7 @@ declare module 'vue' {
     HeaderSearch: typeof import('./../components/layout/HeaderSearch.vue')['default']
     Input: typeof import('./../lib/components/ui/input/Input.vue')['default']
     ListenArtwork: typeof import('./../components/listen/ListenArtwork.vue')['default']
+    ListenCaptions: typeof import('./../components/audio/ListenCaptions.vue')['default']
     ListenControls: typeof import('./../components/listen/ListenControls.vue')['default']
     ListenRelated: typeof import('./../components/listen/ListenRelated.vue')['default']
     ListenTrackInfo: typeof import('./../components/listen/ListenTrackInfo.vue')['default']

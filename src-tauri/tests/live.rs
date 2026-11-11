@@ -86,8 +86,9 @@ async fn assert_audio_range(client: &YoutubeClient, video_id: &str) {
     assert_eq!(bytes.len(), 1024, "expected exactly the requested range");
 
     eprintln!(
-        "audio: itag {} served {total} bytes as 206 (open-ended) + a 1 KiB seek",
-        info.itag
+        "audio: itag {} served {total} bytes as 206 (open-ended) + a 1 KiB seek, captions={}",
+        info.itag,
+        info.captions.len()
     );
 }
 

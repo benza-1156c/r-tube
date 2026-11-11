@@ -3,7 +3,6 @@ import { ref, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import {
   ArrowLeft,
-  Settings as SettingsIcon,
   Sliders,
   Volume2,
   VolumeX,
@@ -315,11 +314,7 @@ onMounted(async () => {
         >
           <ArrowLeft class="h-5 w-5" />
         </Button>
-        <div
-          class="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary"
-        >
-          <SettingsIcon class="h-5 w-5" />
-        </div>
+
         <div>
           <h1 class="text-xl font-bold text-foreground">Settings</h1>
           <p class="text-xs text-muted-foreground">

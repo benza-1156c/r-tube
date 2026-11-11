@@ -3,13 +3,11 @@ import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { commands, type ChannelPage_Deserialize } from "@/bindings";
 import { Loader2, UserPlus, UserCheck } from "@lucide/vue";
-import { useLibrary } from "@/composables/useLibrary";
 
 defineOptions({ name: "ChannelPage" });
 
 const route = useRoute();
 const router = useRouter();
-const library = useLibrary();
 
 const channelId = computed(() =>
   String(
@@ -28,7 +26,7 @@ async function load(): Promise<void> {
     const res = await commands.getChannelPage(channelId.value);
     if (res.status === "ok") {
       page.value = res.data;
-      subscribed.value = library.isSubscribedChannel(channelId.value);
+      subscribed.value = false;
     }
   } catch (err) {
     console.warn("Failed to load channel:", err);
@@ -45,7 +43,7 @@ async function toggleSubscription(): Promise<void> {
     const res = await commands.setSubscription(channelId.value, next);
     if (res.status === "ok") {
       subscribed.value = next;
-      library.setSubscribedChannel(channelId.value, next);
+      subscribed.value = next;
     }
   } catch (err) {
     console.warn("Failed to update subscription:", err);

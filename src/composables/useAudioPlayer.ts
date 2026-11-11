@@ -1,11 +1,12 @@
-import { shallowRef } from "vue";
-import { commands } from "@/bindings";
+import { computed, ref, shallowRef } from "vue";
+import { commands, type CaptionTrack } from "@/bindings";
 import { router } from "@/router";
+import { parseVtt, type CaptionCue } from "@/lib/vtt";
 import { useSettings } from "./useSettings";
-import { useLibrary } from "./useLibrary";
 import { usePlayer } from "./usePlayer";
 import { fetchUpNext } from "./useUpNext";
 import * as state from "./playerState";
+import type { CaptionOption } from "./playerState";
 import {
   reportPlaybackTime,
   startPlaybackHistory,
@@ -30,10 +31,83 @@ let autoplayOnLoad = true;
 let bound = false;
 let nextTimer: ReturnType<typeof setTimeout> | null = null;
 
+/** Caption cues per language, used by the listen page overlay. */
+const captionCues = shallowRef<Record<string, CaptionCue[]>>({});
+const captionLanguage = ref("");
+const captionBlobUrls: string[] = [];
+let captionToken = 0;
+
+function revokeCaptionUrls(): void {
+  while (captionBlobUrls.length > 0) {
+    const url = captionBlobUrls.pop();
+    if (url) URL.revokeObjectURL(url);
+  }
+}
+
+async function loadCaptions(tracks: CaptionTrack[]): Promise<void> {
+  const token = ++captionToken;
+  revokeCaptionUrls();
+  captionCues.value = {};
+  captionLanguage.value = "";
+
+  if (tracks.length === 0) return;
+
+  const options: CaptionOption[] = [];
+  const cues: Record<string, CaptionCue[]> = {};
+
+  for (const track of tracks) {
+    try {
+      const res = await commands.getSubtitleContent(track.vttUrl);
+      if (token !== captionToken) return;
+      if (res.status !== "ok" || !res.data) continue;
+
+      const blobUrl = URL.createObjectURL(
+        new Blob([res.data], { type: "text/vtt" }),
+      );
+      captionBlobUrls.push(blobUrl);
+      options.push({
+        id: track.languageCode,
+        name: track.name,
+        language: track.languageCode,
+        url: blobUrl,
+      });
+      cues[track.languageCode] = parseVtt(res.data);
+    } catch (err) {
+      console.warn("Could not load caption track:", track.languageCode, err);
+    }
+  }
+
+  if (token !== captionToken) return;
+  state.captionTracks.value = options;
+  captionCues.value = cues;
+  captionLanguage.value = options[0]?.language ?? "";
+}
+
+function clearCaptions(): void {
+  captionToken++;
+  revokeCaptionUrls();
+  state.captionTracks.value = [];
+  captionCues.value = {};
+  captionLanguage.value = "";
+}
+
 export function useAudioPlayer() {
   const { settings, updateSettings } = useSettings();
-  const library = useLibrary();
   const player = usePlayer();
+
+  /** Subtitle under the artwork while the audio engine is playing. */
+  const activeCue = computed<CaptionCue | null>(() => {
+    const language = captionLanguage.value;
+    if (!language) return null;
+    const cues = captionCues.value[language];
+    if (!cues) return null;
+    const time = state.currentTime.value;
+    return cues.find((cue) => time >= cue.start && time <= cue.end) ?? null;
+  });
+
+  function setCaptionLanguage(language: string): void {
+    captionLanguage.value = language;
+  }
 
   function clearNextTimer(): void {
     if (nextTimer) {
@@ -87,11 +161,6 @@ export function useAudioPlayer() {
       }
       state.status.value = "paused";
       reportPlaybackTime();
-
-      const video = state.currentVideo.value;
-      if (video) {
-        library.setResume(video.id, el.currentTime, video.duration);
-      }
     });
 
     el.addEventListener("timeupdate", () => {
@@ -142,9 +211,6 @@ export function useAudioPlayer() {
     state.status.value = "ended";
     reportPlaybackTime();
 
-    const finishedId = state.currentVideo.value?.id;
-    if (finishedId) library.clearResume(finishedId);
-
     if (!state.isAutoplayEnabled.value) return;
 
     // Re-resolve the queue when the page did not manage to (or lost) it.
@@ -188,8 +254,7 @@ export function useAudioPlayer() {
   ): Promise<void> {
     const token = ++loadToken;
     const isStale = (): boolean => token !== loadToken;
-    // A hand-off position wins; otherwise resume where this track stopped.
-    const resumeAt = options.resumeAt ?? library.getResume(videoId);
+    const resumeAt = options.resumeAt ?? 0;
 
     clearNextTimer();
     state.activeEngine.value = "audio";
@@ -257,6 +322,7 @@ export function useAudioPlayer() {
 
     el.src = info.url;
     el.load();
+    void loadCaptions(info.captions ?? []);
 
     if (pendingSeek === null && autoplayOnLoad) {
       el.play().catch((err: unknown) =>
@@ -272,16 +338,8 @@ export function useAudioPlayer() {
     clearNextTimer();
     loadToken++;
     pendingSeek = null;
+    clearCaptions();
 
-    const stoppingVideo = state.currentVideo.value;
-    const stoppingElement = audioElement.value;
-    if (stoppingVideo && stoppingElement) {
-      library.setResume(
-        stoppingVideo.id,
-        stoppingElement.currentTime,
-        stoppingVideo.duration,
-      );
-    }
 
     const el = audioElement.value;
     if (el) {
@@ -306,5 +364,17 @@ export function useAudioPlayer() {
     state.currentTime.value = 0;
   }
 
-  return { attachAudio, loadAudio, stopAudio, audioElement };
+  return {
+    attachAudio,
+    loadAudio,
+    stopAudio,
+    audioElement,
+    captionTracks: state.captionTracks,
+    captionCueList: computed(
+      () => captionCues.value[captionLanguage.value] ?? [],
+    ),
+    activeCue,
+    captionLanguage,
+    setCaptionLanguage,
+  };
 }

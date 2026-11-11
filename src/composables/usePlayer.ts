@@ -18,7 +18,6 @@ import type {
   PlayerStatus,
 } from "./playerState";
 import { fetchUpNext } from "./useUpNext";
-import { useLibrary } from "./useLibrary";
 
 export type { CaptionOption, CurrentVideoMeta, PlayerStatus };
 
@@ -59,7 +58,6 @@ function revokeBlobUrls(): void {
 
 export function usePlayer() {
   const { settings, updateSettings } = useSettings();
-  const library = useLibrary();
   const isPlaying = computed<boolean>(() => state.status.value === "playing");
 
   /** Apply the resolved default quality once the element knows its renditions. */
@@ -345,8 +343,7 @@ export function usePlayer() {
     // engine back has to start from a clean slate.
     state.captionTracks.value = [];
 
-    // A hand-off position wins; otherwise resume where this video stopped.
-    const resumeAt = options.resumeAt ?? library.getResume(videoId);
+    const resumeAt = options.resumeAt ?? 0;
     await loadStream(videoId, { ...options, resumeAt });
   }
 
@@ -402,12 +399,6 @@ export function usePlayer() {
       state.status.value = "paused";
     }
     reportPlaybackTime();
-
-    const video = state.currentVideo.value;
-    const element = videoElement.value;
-    if (video && element) {
-      library.setResume(video.id, element.currentTime, video.duration);
-    }
   }
 
   function onTimeUpdate(e: Event): void {
@@ -445,9 +436,6 @@ export function usePlayer() {
 
     state.status.value = "ended";
     reportPlaybackTime();
-
-    const finishedId = state.currentVideo.value?.id;
-    if (finishedId) library.clearResume(finishedId);
 
     if (!state.isAutoplayEnabled.value) return;
 
@@ -580,10 +568,6 @@ export function usePlayer() {
    */
   async function releaseVideoEngine(): Promise<void> {
     const el = videoElement.value;
-    const video = state.currentVideo.value;
-    if (el && video) {
-      library.setResume(video.id, el.currentTime, video.duration);
-    }
     if (el) {
       try {
         el.pause();
@@ -605,14 +589,6 @@ export function usePlayer() {
    * Close the player and release everything the stream holds.
    */
   function closePlayer(): void {
-    // Capture the session before its state is cleared, so the resume position
-    // can be saved.
-    const closing = state.currentVideo.value;
-    const closingElement = videoElement.value;
-    if (closing && closingElement) {
-      library.setResume(closing.id, closingElement.currentTime, closing.duration);
-    }
-
     cancelAutoplay();
     state.upNextVideo.value = null;
     loadToken++;

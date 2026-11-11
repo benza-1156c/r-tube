@@ -451,6 +451,23 @@ impl YoutubeClient {
             })
             .unwrap_or_default();
 
+        // Audio-only mode has no video element, so the captions are delivered
+        // with the stream instead of through the player.
+        let captions = match self.anon().await {
+            Ok(anon) => match anon.get_transcript_tracks(video_id).await {
+                Ok(tracks) => tracks
+                    .into_iter()
+                    .map(|track| CaptionTrack {
+                        language_code: track.language_code,
+                        name: track.name,
+                        vtt_url: format!("{}&fmt=vtt", track.base_url),
+                    })
+                    .collect(),
+                Err(_) => Vec::new(),
+            },
+            Err(_) => Vec::new(),
+        };
+
         Ok(AudioStreamInfo {
             itag: format.itag,
             url,
@@ -473,6 +490,7 @@ impl YoutubeClient {
             description,
             view_count,
             is_live,
+            captions,
         })
     }
 

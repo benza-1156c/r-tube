@@ -29,12 +29,17 @@ export function useMediaSession(): void {
   }
 
   watch(
-    () => state.currentVideo.value,
-    (video) => {
-      if (!video || !state.isOpen.value) {
+    [() => state.currentVideo.value, () => state.isOpen.value],
+    ([video, open]) => {
+      if (!open || !video) {
         navigator.mediaSession.metadata = null;
+        navigator.mediaSession.playbackState = "none";
         return;
       }
+
+      // Keep the previous metadata while a new track loads: publishing a
+      // "Loading …" placeholder made Windows show a stale entry.
+      if (!video.title || video.title.startsWith("Loading ")) return;
 
       navigator.mediaSession.metadata = new MediaMetadata({
         title: video.title,
@@ -52,7 +57,11 @@ export function useMediaSession(): void {
     () => state.status.value,
     (status) => {
       navigator.mediaSession.playbackState =
-        status === "playing" ? "playing" : "paused";
+        status === "playing"
+          ? "playing"
+          : status === "idle" || status === "ended"
+            ? "none"
+            : "paused";
     },
     { immediate: true },
   );

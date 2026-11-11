@@ -6,8 +6,6 @@ import {
   Flame,
   CirclePlay,
   History,
-  Clock,
-  Heart,
   Settings,
 } from "@lucide/vue";
 import { commands } from "@/bindings";
@@ -32,8 +30,6 @@ const mainItems = [
 
 const libraryItems = [
   { title: "History", path: "/history", icon: History },
-  { title: "Watch later", path: "/history?tab=watch-later", icon: Clock },
-  { title: "Liked videos", path: "/history?tab=liked", icon: Heart },
 ];
 
 interface ChannelItem {
