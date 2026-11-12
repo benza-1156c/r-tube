@@ -31,11 +31,17 @@ pub fn open_login_window(app: &AppHandle) -> Result<WebviewWindow, AppError> {
         let _ = std::fs::remove_dir_all(&login_profile_dir);
     }
 
-    WebviewWindowBuilder::new(app, LOGIN_WINDOW_LABEL, WebviewUrl::External(url))
+    let builder = WebviewWindowBuilder::new(app, LOGIN_WINDOW_LABEL, WebviewUrl::External(url))
         .title("Sign in to YouTube")
         .inner_size(500.0, 720.0)
-        .center()
-        .data_directory(login_profile_dir)
+        .data_directory(login_profile_dir);
+
+    // `center` is part of Tauri's desktop-only builder API; mobile webviews
+    // always fill the screen, so the call is skipped there.
+    #[cfg(desktop)]
+    let builder = builder.center();
+
+    builder
         .build()
         .map_err(|e| AppError::Internal(format!("Failed to create login window: {e}")))
 }
