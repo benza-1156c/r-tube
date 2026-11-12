@@ -6,8 +6,18 @@ on:
       - "v*"
   workflow_dispatch:
     inputs:
+      bump:
+        description: "Version Bump (auto, patch, minor, major)"
+        required: false
+        default: "auto"
+        type: choice
+        options:
+          - "auto"
+          - "patch"
+          - "minor"
+          - "major"
       tag_name:
-        description: "Release Tag (e.g. v0.1.0)"
+        description: "Custom Release Tag (leave empty for automatic)"
         required: false
         type: string
         default: ""
@@ -22,56 +32,136 @@ on:
         type: boolean
         default: false
 
+permissions:
+  contents: write
+
 jobs:
+  prepare-version:
+    name: Prepare Version & Tag
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Determine & Sync Version
+        id: version
+        shell: bash
+        run: |
+          git fetch --tags --force || true
+
+          # Check triggers
+          if [ -n "${{ github.ref_name }}" ] && [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            echo "Triggered by git tag: ${{ github.ref_name }}"
+            bun run scripts/auto-version.js "${{ github.ref_name }}"
+          elif [ -n "${{ inputs.tag_name }}" ]; then
+            echo "Custom tag specified: ${{ inputs.tag_name }}"
+            bun run scripts/auto-version.js "${{ inputs.tag_name }}"
+          else
+            echo "Auto-detecting version with bump strategy: ${{ inputs.bump || 'auto' }}"
+            bun run scripts/auto-version.js --bump "${{ inputs.bump || 'auto' }}"
+          fi
+
+      - name: Commit and Push Tag
+        shell: bash
+        run: |
+          TAG="${{ steps.version.outputs.tag }}"
+          VERSION="${{ steps.version.outputs.version }}"
+          echo "Target Release Tag: $TAG (version: $VERSION)"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Commit version bumps if files changed
+          if ! git diff --quiet package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml; then
+            git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml
+            git commit -m "chore(release): $TAG [skip ci]" || true
+            git push origin HEAD || echo "Could not push commit to branch, continuing..."
+          fi
+
+          # Only push git tag if it does not already exist
+          if [ "${{ github.ref }}" != "refs/tags/$TAG" ]; then
+            git tag -f "$TAG"
+            git push origin "$TAG" --force
+          fi
+
   build-windows:
+    name: Build Windows
+    needs: prepare-version
     uses: ./.github/workflows/build-windows.yml
     with:
+      ref: ${{ needs.prepare-version.outputs.tag }}
+      app_version: ${{ needs.prepare-version.outputs.version }}
       upload_artifact: true
     secrets: inherit
 
   build-macos:
+    name: Build macOS
+    needs: prepare-version
     uses: ./.github/workflows/build-macos.yml
     with:
+      ref: ${{ needs.prepare-version.outputs.tag }}
+      app_version: ${{ needs.prepare-version.outputs.version }}
       upload_artifact: true
     secrets: inherit
 
   build-linux:
+    name: Build Linux
+    needs: prepare-version
     uses: ./.github/workflows/build-linux.yml
     with:
+      ref: ${{ needs.prepare-version.outputs.tag }}
+      app_version: ${{ needs.prepare-version.outputs.version }}
       upload_artifact: true
     secrets: inherit
 
   build-android:
+    name: Build Android
+    needs: prepare-version
     uses: ./.github/workflows/build-android.yml
     with:
+      ref: ${{ needs.prepare-version.outputs.tag }}
+      app_version: ${{ needs.prepare-version.outputs.version }}
       upload_artifact: true
     secrets: inherit
 
   build-ios:
+    name: Build iOS
+    needs: prepare-version
     uses: ./.github/workflows/build-ios.yml
     with:
+      ref: ${{ needs.prepare-version.outputs.tag }}
+      app_version: ${{ needs.prepare-version.outputs.version }}
       upload_artifact: true
     secrets: inherit
 
   publish-release:
-    needs: [build-windows, build-macos, build-linux, build-android, build-ios]
-    if: always() && !cancelled() && !contains(needs.*.result, 'failure')
+    name: Publish Release
+    needs:
+      [
+        prepare-version,
+        build-windows,
+        build-macos,
+        build-linux,
+        build-android,
+        build-ios,
+      ]
+    if: always() && !cancelled() && needs.prepare-version.result == 'success' && !contains(needs.*.result, 'failure')
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - name: Determine Release Tag
-        id: vars
-        shell: bash
-        run: |
-          if [ -n "${{ github.ref_name }}" ] && [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            echo "tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
-          elif [ -n "${{ inputs.tag_name }}" ]; then
-            echo "tag=${{ inputs.tag_name }}" >> $GITHUB_OUTPUT
-          else
-            echo "tag=v0.1.0-$(date +'%Y%m%d%H%M%S')" >> $GITHUB_OUTPUT
-          fi
-
       - name: Download all build artifacts
         uses: actions/download-artifact@v4
         with:
@@ -85,8 +175,8 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.vars.outputs.tag }}
-          name: Release ${{ steps.vars.outputs.tag }}
+          tag_name: ${{ needs.prepare-version.outputs.tag }}
+          name: Release ${{ needs.prepare-version.outputs.tag }}
           draft: ${{ inputs.draft || false }}
           prerelease: ${{ inputs.prerelease || false }}
           generate_release_notes: true
@@ -98,7 +188,6 @@ jobs:
             artifacts/*.AppImage
             artifacts/*.apk
             artifacts/*.aab
-            artifacts/*.ipa
             artifacts/*.tar.gz
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            artifacts/*.app
+            artifacts/*.ipa

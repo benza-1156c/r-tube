@@ -2,8 +2,24 @@ name: Build Android
 
 on:
   workflow_dispatch:
+    inputs:
+      app_version:
+        description: "Version to build (optional, auto-detected if empty)"
+        required: false
+        type: string
+        default: ""
   workflow_call:
     inputs:
+      ref:
+        description: "Git ref or tag to checkout"
+        required: false
+        type: string
+        default: ""
+      app_version:
+        description: "Version to build"
+        required: false
+        type: string
+        default: ""
       upload_artifact:
         description: "Upload build artifact"
         required: false
@@ -16,6 +32,9 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || '' }}
+          fetch-depth: 0
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -52,6 +71,11 @@ jobs:
       - name: Install Frontend Dependencies
         run: bun install --frozen-lockfile || bun install
 
+      - name: Sync App Version
+        shell: bash
+        run: |
+          bun run scripts/auto-version.js "${{ inputs.app_version }}"
+
       - name: Initialize Android Target
         shell: bash
         run: |
@@ -70,4 +94,3 @@ jobs:
           path: |
             src-tauri/gen/android/app/build/outputs/apk/**/*.apk
           if-no-files-found: warn
-

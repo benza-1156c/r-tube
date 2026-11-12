@@ -2,8 +2,24 @@ name: Build macOS
 
 on:
   workflow_dispatch:
+    inputs:
+      app_version:
+        description: "Version to build (optional, auto-detected if empty)"
+        required: false
+        type: string
+        default: ""
   workflow_call:
     inputs:
+      ref:
+        description: "Git ref or tag to checkout"
+        required: false
+        type: string
+        default: ""
+      app_version:
+        description: "Version to build"
+        required: false
+        type: string
+        default: ""
       upload_artifact:
         description: "Upload build artifact"
         required: false
@@ -27,6 +43,9 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || '' }}
+          fetch-depth: 0
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -45,6 +64,11 @@ jobs:
 
       - name: Install Frontend Dependencies
         run: bun install --frozen-lockfile || bun install
+
+      - name: Sync App Version
+        shell: bash
+        run: |
+          bun run scripts/auto-version.js "${{ inputs.app_version }}"
 
       - name: Build Tauri App
         uses: tauri-apps/tauri-action@v0
@@ -65,4 +89,3 @@ jobs:
             src-tauri/target/**/bundle/macos/*.app
             src-tauri/target/**/bundle/macos/*.tar.gz
           if-no-files-found: warn
-
