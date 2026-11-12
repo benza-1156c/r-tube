@@ -46,13 +46,13 @@ jobs:
       contents: write
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: ${{ inputs.ref || '' }}
           fetch-depth: 0
 
       - name: Setup Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: "zulu"
           java-version: "17"
@@ -77,6 +77,31 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
+
+      - name: Install libclang for QuickJS bindings
+        shell: bash
+        run: |
+          if [ -z "${ANDROID_NDK_ROOT:-}" ]; then
+            echo "ANDROID_NDK_ROOT is not set; cannot point bindgen at the NDK sysroot" >&2
+            exit 1
+          fi
+
+          sudo apt-get update
+          sudo apt-get install -y libclang-dev
+
+          # rquickjs-sys has no pre-generated bindings for Android, so bindgen
+          # must parse the bundled QuickJS headers with clang. Give clang the
+          # Android target triple and the NDK sysroot headers for each target
+          # we may build.
+          sysroot="$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/sysroot"
+          echo "BINDGEN_EXTRA_CLANG_ARGS_aarch64_linux_android=--target=aarch64-linux-android24 --sysroot=$sysroot" >> "$GITHUB_ENV"
+          echo "BINDGEN_EXTRA_CLANG_ARGS_armv7_linux_androideabi=--target=armv7a-linux-androideabi24 --sysroot=$sysroot" >> "$GITHUB_ENV"
+          echo "BINDGEN_EXTRA_CLANG_ARGS_x86_64_linux_android=--target=x86_64-linux-android24 --sysroot=$sysroot" >> "$GITHUB_ENV"
+
+          libclang_so="$(find /usr/lib/llvm-*/lib -maxdepth 1 -name 'libclang.so' 2>/dev/null | head -n 1 || true)"
+          if [ -n "$libclang_so" ]; then
+            echo "LIBCLANG_PATH=$(dirname "$libclang_so")" >> "$GITHUB_ENV"
+          fi
 
       - name: Rust Cache
         uses: swatinem/rust-cache@v2
@@ -104,7 +129,7 @@ jobs:
 
       - name: Upload Android APK
         if: ${{ inputs.upload_artifact != false }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: r-tube-android-apk
           path: |
@@ -113,7 +138,7 @@ jobs:
 
       - name: Publish to GitHub Release
         if: ${{ inputs.publish_release != false }}
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ steps.version.outputs.tag }}
           name: Release ${{ steps.version.outputs.tag }}
