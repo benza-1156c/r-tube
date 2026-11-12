@@ -167,7 +167,33 @@ jobs:
 
       - name: Display downloaded files
         shell: bash
-        run: ls -la artifacts
+        run: find artifacts -type f | sort
+
+      # upload-artifact keeps the directory layout relative to the glob's
+      # non-magic prefix, so the downloaded tree looks like
+      # `artifacts/msi/*.msi`, `artifacts/deb/*.deb`,
+      # `artifacts/aarch64-apple-darwin/release/bundle/dmg/*.dmg`, ... .
+      # Flatten every installer into one directory so the release step can
+      # attach them with a simple `release-assets/*` glob.
+      - name: Collect release files
+        shell: bash
+        run: |
+          mkdir -p release-assets
+          shopt -s globstar nullglob
+          for f in artifacts/**/*.{msi,exe,dmg,deb,AppImage,apk,ipa,tar.gz}; do
+            if [ -f "$f" ]; then
+              cp -v "$f" release-assets/
+            fi
+          done
+
+          count=$(find release-assets -maxdepth 1 -type f | wc -l)
+          echo "Collected $count release asset(s)"
+          ls -la release-assets
+
+          if [ "$count" -eq 0 ]; then
+            echo "::error::No installer files were found in the downloaded artifacts"
+            exit 1
+          fi
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
@@ -177,14 +203,4 @@ jobs:
           draft: ${{ inputs.draft || false }}
           prerelease: ${{ inputs.prerelease || false }}
           generate_release_notes: true
-          files: |
-            artifacts/*.msi
-            artifacts/*.exe
-            artifacts/*.dmg
-            artifacts/*.deb
-            artifacts/*.AppImage
-            artifacts/*.apk
-            artifacts/*.aab
-            artifacts/*.tar.gz
-            artifacts/*.app
-            artifacts/*.ipa
+          files: release-assets/*
