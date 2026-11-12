@@ -86,13 +86,6 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
-    '/(library)/history/': RouteRecordInfo<
-      '/(library)/history/',
-      '/history',
-      Record<never, never>,
-      Record<never, never>,
-      | never
-    >,
     '/(player)/listen/[id]': RouteRecordInfo<
       '/(player)/listen/[id]',
       '/listen/:id',
@@ -105,6 +98,13 @@ declare module 'vue-router/auto-routes' {
       '/watch/:id',
       { id: ParamValue<true> },
       { id: ParamValue<false> },
+      | never
+    >,
+    '/(library)/history/': RouteRecordInfo<
+      '/(library)/history/',
+      '/history',
+      Record<never, never>,
+      Record<never, never>,
       | never
     >,
   }
@@ -174,12 +174,6 @@ declare module 'vue-router/auto-routes' {
       views:
         | never
     }
-    'src/router/(library)/history/index.vue': {
-      routes:
-        | '/(library)/history/'
-      views:
-        | never
-    }
     'src/router/(player)/listen/[id].vue': {
       routes:
         | '/(player)/listen/[id]'
@@ -189,6 +183,12 @@ declare module 'vue-router/auto-routes' {
     'src/router/(player)/watch/[id].vue': {
       routes:
         | '/(player)/watch/[id]'
+      views:
+        | never
+    }
+    'src/router/(library)/history/index.vue': {
+      routes:
+        | '/(library)/history/'
       views:
         | never
     }

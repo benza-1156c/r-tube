@@ -194,7 +194,7 @@ jobs:
         run: |
           mkdir -p release-assets
           shopt -s globstar nullglob
-          for f in artifacts/**/*.{msi,exe,dmg,deb,AppImage,apk,ipa,tar.gz}; do
+          for f in artifacts/**/*.{msi,exe,dmg,deb,AppImage,apk,aab,ipa,tar.gz}; do
             if [ -f "$f" ]; then
               cp -v "$f" release-assets/
             fi

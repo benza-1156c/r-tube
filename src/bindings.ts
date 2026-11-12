@@ -494,6 +494,20 @@ export type TrendingFeed_Serialize = {
 	videos: VideoItem_Serialize[],
 };
 
+export type VideoChapter = VideoChapter_Serialize | VideoChapter_Deserialize;
+
+export type VideoChapter_Deserialize = {
+	title: string,
+	startMs: number,
+	thumbnail?: string | null,
+};
+
+export type VideoChapter_Serialize = {
+	title: string,
+	startMs: number,
+	thumbnail: string | null,
+};
+
 export type VideoComment = VideoComment_Serialize | VideoComment_Deserialize;
 
 export type VideoComment_Deserialize = {
@@ -556,20 +570,6 @@ export type VideoItem_Serialize = {
 	progressPercent: number | null,
 };
 
-export type VideoChapter = VideoChapter_Serialize | VideoChapter_Deserialize;
-
-export type VideoChapter_Deserialize = {
-	title: string,
-	startMs: number,
-	thumbnail?: string | null,
-};
-
-export type VideoChapter_Serialize = {
-	title: string,
-	startMs: number,
-	thumbnail: string | null,
-};
-
 export type WatchNextResults = WatchNextResults_Serialize | WatchNextResults_Deserialize;
 
 export type WatchNextResults_Deserialize = {
@@ -578,7 +578,7 @@ export type WatchNextResults_Deserialize = {
 	currentAuthor?: string | null,
 	relatedVideos: VideoItem_Deserialize[],
 	playlistItems: PlaylistPanelItem_Deserialize[],
-	chapters: VideoChapter_Deserialize[],
+	chapters?: VideoChapter_Deserialize[],
 	continuationToken?: string | null,
 };
 
