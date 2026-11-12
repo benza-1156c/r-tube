@@ -56,6 +56,7 @@ function openVideo() {
       <span
         v-if="video.duration"
         class="absolute bottom-2 right-2 flex items-center gap-1 rounded-md bg-black/80 px-1.5 py-0.5 text-xs font-semibold tracking-wide text-white"
+        :class="{ 'bottom-2.5': video.progressPercent && video.progressPercent > 0 }"
       >
         <ListMusic
           v-if="
@@ -67,6 +68,17 @@ function openVideo() {
         />
         {{ video.duration }}
       </span>
+
+      <!-- Watch Progress Bar -->
+      <div
+        v-if="video.progressPercent !== undefined && video.progressPercent !== null && video.progressPercent > 0"
+        class="absolute bottom-0 left-0 right-0 h-1 bg-black/60 z-10 overflow-hidden"
+      >
+        <div
+          class="h-full bg-red-600 rounded-r-xs transition-all duration-300"
+          :style="{ width: `${Math.min(100, Math.max(0, video.progressPercent))}%` }"
+        />
+      </div>
     </div>
 
     <!-- Metadata Section -->

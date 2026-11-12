@@ -200,6 +200,7 @@ export type ChannelVideo_Deserialize = {
 	duration?: string | null,
 	published?: string | null,
 	views?: string | null,
+	progressPercent?: number | null,
 };
 
 export type ChannelVideo_Serialize = {
@@ -209,6 +210,7 @@ export type ChannelVideo_Serialize = {
 	duration: string | null,
 	published: string | null,
 	views: string | null,
+	progressPercent: number | null,
 };
 
 export type CommentsPage = CommentsPage_Serialize | CommentsPage_Deserialize;
@@ -536,6 +538,7 @@ export type VideoItem_Deserialize = {
 	viewCount: string,
 	publishedAt: string,
 	playlistId?: string | null,
+	progressPercent?: number | null,
 };
 
 export type VideoItem_Serialize = {
@@ -550,6 +553,21 @@ export type VideoItem_Serialize = {
 	viewCount: string,
 	publishedAt: string,
 	playlistId: string | null,
+	progressPercent: number | null,
+};
+
+export type VideoChapter = VideoChapter_Serialize | VideoChapter_Deserialize;
+
+export type VideoChapter_Deserialize = {
+	title: string,
+	startMs: number,
+	thumbnail?: string | null,
+};
+
+export type VideoChapter_Serialize = {
+	title: string,
+	startMs: number,
+	thumbnail: string | null,
 };
 
 export type WatchNextResults = WatchNextResults_Serialize | WatchNextResults_Deserialize;
@@ -560,6 +578,7 @@ export type WatchNextResults_Deserialize = {
 	currentAuthor?: string | null,
 	relatedVideos: VideoItem_Deserialize[],
 	playlistItems: PlaylistPanelItem_Deserialize[],
+	chapters: VideoChapter_Deserialize[],
 	continuationToken?: string | null,
 };
 
@@ -569,6 +588,7 @@ export type WatchNextResults_Serialize = {
 	currentAuthor: string | null,
 	relatedVideos: VideoItem_Serialize[],
 	playlistItems: PlaylistPanelItem_Serialize[],
+	chapters: VideoChapter_Serialize[],
 	continuationToken: string | null,
 };
 

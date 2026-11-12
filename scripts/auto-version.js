@@ -1,7 +1,52 @@
-import { execSync } from "node:child_process";
+import { execFileSync, execSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
+
+// Conventional Commits (https://www.conventionalcommits.org) decide the bump:
+//   <type>!:  or a "BREAKING CHANGE:" footer -> major
+//   feat:                                    -> minor
+//   everything else (fix:, perf:, chore:, …) -> patch
+// Only the subject line is checked for the type, and the release commits this
+// script pushes are ignored so they never count as a feature.
+const RELEASE_COMMIT = /^chore\(release\)/;
+const BREAKING_HEADER = /^[a-zA-Z]+(\([^)]*\))?!:/;
+const BREAKING_FOOTER = /(^|\n)BREAKING[ -]CHANGE:/;
+const FEATURE_HEADER = /^feat(\([^)]*\))?:/;
+
+function getCommitMessages(sinceTag) {
+  try {
+    const stdout = execFileSync("git", ["log", `${sinceTag}..HEAD`, "--format=%B%x00"], {
+      encoding: "utf8",
+    });
+    return stdout
+      .split("\u0000")
+      .map((message) => message.trim())
+      .filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+function detectBumpType(sinceTag) {
+  let bump = "patch";
+
+  for (const message of getCommitMessages(sinceTag)) {
+    const [header = "", ...rest] = message.split("\n");
+    const body = rest.join("\n");
+
+    if (RELEASE_COMMIT.test(header)) continue;
+
+    if (BREAKING_HEADER.test(header) || BREAKING_FOOTER.test(body)) {
+      return "major";
+    }
+    if (FEATURE_HEADER.test(header)) {
+      bump = "minor";
+    }
+  }
+
+  return bump;
+}
 
 function getGitTags() {
   try {
@@ -103,24 +148,8 @@ if (explicitVersion) {
       let bumpType = bumpArg;
 
       if (bumpType === "auto") {
-        try {
-          const log = execSync(`git log ${latestTagRaw}..HEAD --oneline`, {
-            encoding: "utf8",
-          });
-          if (log.includes("BREAKING CHANGE:") || log.includes("!:")) {
-            bumpType = "major";
-          } else if (
-            log.toLowerCase().includes("feat:") ||
-            log.toLowerCase().includes("feat(") ||
-            log.toLowerCase().includes("feature:")
-          ) {
-            bumpType = "minor";
-          } else {
-            bumpType = "patch";
-          }
-        } catch {
-          bumpType = "patch";
-        }
+        bumpType = detectBumpType(latestTagRaw);
+        console.log(`[Auto-Version] Conventional commits since ${latestTagRaw} -> ${bumpType} bump`);
       }
 
       console.log(`[Auto-Version] Latest tag is ${latestTagRaw}, applying bump: ${bumpType}`);

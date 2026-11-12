@@ -674,6 +674,7 @@ impl YoutubeClient {
                     duration: video.duration,
                     published: video.published_time,
                     views: video.views,
+                    progress_percent: video.progress_percent,
                 })
                 .collect(),
             continuation: videos.continuation_token,

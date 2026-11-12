@@ -1,9 +1,19 @@
 name: Release All Platforms
 
 on:
+  # Every push to main ships a release: the version bump is derived from the
+  # Conventional Commit types since the last tag, so no manual version choice
+  # is needed. The version-bump commit this workflow pushes is tagged
+  # `[skip ci]` and filtered out below, and commits made with GITHUB_TOKEN do
+  # not re-trigger workflows, so there is no loop.
   push:
+    branches:
+      - main
     tags:
       - "v*"
+    paths-ignore:
+      - "**.md"
+      - ".github/**"
   workflow_dispatch:
     inputs:
       bump:
@@ -21,11 +31,6 @@ on:
         required: false
         type: string
         default: ""
-      draft:
-        description: "Create Draft Release"
-        required: false
-        type: boolean
-        default: false
       prerelease:
         description: "Create Pre-Release"
         required: false
@@ -35,9 +40,18 @@ on:
 permissions:
   contents: write
 
+# Serialise releases so two pushes cannot compute the same next version and
+# race each other while creating the tag.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   prepare-version:
     name: Prepare Version & Tag
+    # Skip the release commit this workflow itself pushes, and let any push
+    # opt out with a "[skip ci]" in its message.
+    if: ${{ !startsWith(github.event.head_commit.message || '', 'chore(release)') && !contains(github.event.head_commit.message || '', '[skip ci]') }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -196,11 +210,39 @@ jobs:
           fi
 
       - name: Create GitHub Release
+        id: release
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ needs.prepare-version.outputs.tag }}
           name: Release ${{ needs.prepare-version.outputs.tag }}
-          draft: ${{ inputs.draft || false }}
           prerelease: ${{ inputs.prerelease || false }}
+          make_latest: ${{ (inputs.prerelease || false) && 'false' || 'true' }}
           generate_release_notes: true
+          fail_on_unmatched_files: true
           files: release-assets/*
+
+      # Always print exactly where the release and its assets went.
+      - name: Release summary
+        shell: bash
+        run: |
+          assets=$(find release-assets -maxdepth 1 -type f | wc -l)
+          {
+            echo "### Release ${{ needs.prepare-version.outputs.tag }}"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Version | \`${{ needs.prepare-version.outputs.version }}\` |"
+            echo "| Assets uploaded | ${assets} |"
+            echo "| Release page | ${{ steps.release.outputs.url }} |"
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          {
+            echo ""
+            echo "<details><summary>Attached files</summary>"
+            echo ""
+            echo '```'
+            ls -1 release-assets
+            echo '```'
+            echo "</details>"
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -155,7 +155,7 @@ watch(channelId, load);
             @click="play(video.id)"
           >
             <div
-              class="aspect-video w-full overflow-hidden rounded-xl bg-muted"
+              class="relative aspect-video w-full overflow-hidden rounded-xl bg-muted"
             >
               <img
                 v-if="video.thumbnail"
@@ -164,6 +164,17 @@ watch(channelId, load);
                 class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                 loading="lazy"
               />
+
+              <!-- Watch Progress Bar -->
+              <div
+                v-if="video.progressPercent !== undefined && video.progressPercent !== null && video.progressPercent > 0"
+                class="absolute bottom-0 left-0 right-0 h-1 bg-black/60 z-10 overflow-hidden"
+              >
+                <div
+                  class="h-full bg-red-600 rounded-r-xs transition-all duration-300"
+                  :style="{ width: `${Math.min(100, Math.max(0, video.progressPercent))}%` }"
+                />
+              </div>
             </div>
             <div class="min-w-0">
               <p

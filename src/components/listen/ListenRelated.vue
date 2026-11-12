@@ -45,6 +45,7 @@ const emit = defineEmits<{
           <span
             v-if="item.duration"
             class="absolute bottom-1 right-1 rounded-sm bg-black/80 px-1 text-[10px] text-white flex items-center gap-0.5"
+            :class="{ 'bottom-1.5': item.progressPercent && item.progressPercent > 0 }"
           >
             <ListMusic
               v-if="item.playlistId || item.duration === 'Mix'"
@@ -52,6 +53,17 @@ const emit = defineEmits<{
             />
             {{ item.duration }}
           </span>
+
+          <!-- Watch Progress Bar -->
+          <div
+            v-if="item.progressPercent !== undefined && item.progressPercent !== null && item.progressPercent > 0"
+            class="absolute bottom-0 left-0 right-0 h-0.5 bg-black/60 z-10 overflow-hidden"
+          >
+            <div
+              class="h-full bg-red-600 rounded-r-xs transition-all duration-300"
+              :style="{ width: `${Math.min(100, Math.max(0, item.progressPercent))}%` }"
+            />
+          </div>
         </div>
 
         <!-- Info -->

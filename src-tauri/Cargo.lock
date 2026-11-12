@@ -2626,7 +2626,7 @@ dependencies = [
 [[package]]
 name = "innertube-rs"
 version = "0.10.1"
-source = "git+https://github.com/benza-1156c/innertube-rs?branch=main#fc021b8fe8715072d7b64d8d61197ba56dd53546"
+source = "git+https://github.com/benza-1156c/innertube-rs?branch=main#f6277177408e9f0734a7b8b06df9aa58f099978a"
 dependencies = [
  "base64 0.23.1",
  "bytes",
@@ -2691,15 +2691,6 @@ name = "itertools"
 version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2b192c782037fadd9cfa75548310488aabdbf3d2da73885b31bd0abd03351285"
-dependencies = [
- "either",
-]
-
-[[package]]
-name = "itertools"
-version = "0.15.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8b4baf93f58d4425749ca49a51c50ebab072c5df6994d08fed93541c331481dc"
 dependencies = [
  "either",
 ]
@@ -3365,7 +3356,7 @@ version = "0.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "680998035259dcfcafe653688bf2aa6d3e2dc05e98be6ab46afb089dc84f1df8"
 dependencies = [
- "proc-macro-crate 3.5.0",
+ "proc-macro-crate 1.3.1",
  "proc-macro2",
  "quote",
  "syn 2.0.119",
@@ -4067,7 +4058,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f461f69b0cacd7a9c2bcac932e0f3a22cb13c29fc9023092502995a771a10491"
 dependencies = [
  "heck 0.5.0",
- "itertools 0.15.0",
+ "itertools 0.14.0",
  "log",
  "multimap",
  "petgraph",
@@ -4086,7 +4077,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c9a367f131d93b3395fc6207c11e67098493ab040def4ce3085adbf186687f7e"
 dependencies = [
  "anyhow",
- "itertools 0.15.0",
+ "itertools 0.14.0",
  "proc-macro2",
  "quote",
  "syn 2.0.119",
