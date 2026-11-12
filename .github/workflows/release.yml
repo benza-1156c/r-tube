@@ -60,7 +60,7 @@ jobs:
         shell: bash
         run: |
           git fetch --tags --force || true
-
+          
           # Check triggers
           if [ -n "${{ github.ref_name }}" ] && [[ "${{ github.ref }}" == refs/tags/* ]]; then
             echo "Triggered by git tag: ${{ github.ref_name }}"
@@ -79,17 +79,17 @@ jobs:
           TAG="${{ steps.version.outputs.tag }}"
           VERSION="${{ steps.version.outputs.version }}"
           echo "Target Release Tag: $TAG (version: $VERSION)"
-
+          
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-
+          
           # Commit version bumps if files changed
           if ! git diff --quiet package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml; then
             git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml
             git commit -m "chore(release): $TAG [skip ci]" || true
             git push origin HEAD || echo "Could not push commit to branch, continuing..."
           fi
-
+          
           # Only push git tag if it does not already exist
           if [ "${{ github.ref }}" != "refs/tags/$TAG" ]; then
             git tag -f "$TAG"
@@ -104,6 +104,7 @@ jobs:
       ref: ${{ needs.prepare-version.outputs.tag }}
       app_version: ${{ needs.prepare-version.outputs.version }}
       upload_artifact: true
+      publish_release: false
     secrets: inherit
 
   build-macos:
@@ -114,6 +115,7 @@ jobs:
       ref: ${{ needs.prepare-version.outputs.tag }}
       app_version: ${{ needs.prepare-version.outputs.version }}
       upload_artifact: true
+      publish_release: false
     secrets: inherit
 
   build-linux:
@@ -124,6 +126,7 @@ jobs:
       ref: ${{ needs.prepare-version.outputs.tag }}
       app_version: ${{ needs.prepare-version.outputs.version }}
       upload_artifact: true
+      publish_release: false
     secrets: inherit
 
   build-android:
@@ -134,6 +137,7 @@ jobs:
       ref: ${{ needs.prepare-version.outputs.tag }}
       app_version: ${{ needs.prepare-version.outputs.version }}
       upload_artifact: true
+      publish_release: false
     secrets: inherit
 
   build-ios:
@@ -144,20 +148,13 @@ jobs:
       ref: ${{ needs.prepare-version.outputs.tag }}
       app_version: ${{ needs.prepare-version.outputs.version }}
       upload_artifact: true
+      publish_release: false
     secrets: inherit
 
   publish-release:
     name: Publish Release
-    needs:
-      [
-        prepare-version,
-        build-windows,
-        build-macos,
-        build-linux,
-        build-android,
-        build-ios,
-      ]
-    if: always() && !cancelled() && needs.prepare-version.result == 'success' && !contains(needs.*.result, 'failure')
+    needs: [prepare-version, build-windows, build-macos, build-linux, build-android, build-ios]
+    if: always() && !cancelled() && needs.prepare-version.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: write

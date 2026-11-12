@@ -10,10 +10,10 @@
     "tauri": "tauri"
   },
   "dependencies": {
-    "@lucide/vue": "^1.70.0",
+    "@lucide/vue": "^1.72.0",
     "@tailwindcss/vite": "^4.3.5",
     "@tauri-apps/api": "^2.12.4",
-    "@tauri-apps/plugin-opener": "^2.7.2",
+    "@tauri-apps/plugin-opener": "^2.7.3",
     "@tauri-apps/plugin-store": "~2.5.1",
     "@videojs/dash-video": "10.3.0",
     "@videojs/hlsjs-video": "10.3.0",
@@ -24,7 +24,7 @@
     "reka-ui": "^2.11.0",
     "tailwindcss": "^4.3.5",
     "vue": "^3.5.45",
-    "vue-router": "^5.4.0"
+    "vue-router": "^5.5.0"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.12.4",
@@ -35,7 +35,7 @@
     "unplugin-auto-import": "^21.1.0",
     "unplugin-vue-components": "^32.1.0",
     "unplugin-vue-router": "^0.19.2",
-    "vite": "^8.3.6",
+    "vite": "^8.3.8",
     "vue-tsc": "^3.3.14"
   }
 }

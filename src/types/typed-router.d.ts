@@ -44,13 +44,6 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
-    '/(library)/history/': RouteRecordInfo<
-      '/(library)/history/',
-      '/history',
-      Record<never, never>,
-      Record<never, never>,
-      | never
-    >,
     '/(browse)/channel/[id]': RouteRecordInfo<
       '/(browse)/channel/[id]',
       '/channel/:id',
@@ -89,6 +82,13 @@ declare module 'vue-router/auto-routes' {
     '/(browse)/trending/': RouteRecordInfo<
       '/(browse)/trending/',
       '/trending',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
+    '/(library)/history/': RouteRecordInfo<
+      '/(library)/history/',
+      '/history',
       Record<never, never>,
       Record<never, never>,
       | never
@@ -138,12 +138,6 @@ declare module 'vue-router/auto-routes' {
       views:
         | never
     }
-    'src/router/(library)/history/index.vue': {
-      routes:
-        | '/(library)/history/'
-      views:
-        | never
-    }
     'src/router/(browse)/channel/[id].vue': {
       routes:
         | '/(browse)/channel/[id]'
@@ -177,6 +171,12 @@ declare module 'vue-router/auto-routes' {
     'src/router/(browse)/trending/index.vue': {
       routes:
         | '/(browse)/trending/'
+      views:
+        | never
+    }
+    'src/router/(library)/history/index.vue': {
+      routes:
+        | '/(library)/history/'
       views:
         | never
     }

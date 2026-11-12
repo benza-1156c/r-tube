@@ -1,3 +1,4 @@
+#[cfg(debug_assertions)]
 use specta_typescript::Typescript;
 use tauri::Manager;
 use tauri_specta::Builder;
@@ -8,6 +9,7 @@ pub mod error;
 pub mod models;
 pub mod services;
 pub mod state;
+pub mod tray;
 pub mod utils;
 
 use state::AppState;
@@ -27,8 +29,18 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(builder.invoke_handler())
+        .on_window_event(|window, event| match event {
+            tauri::WindowEvent::CloseRequested { api, .. } => {
+                api.prevent_close();
+                window.hide().unwrap();
+            }
+            _ => {}
+        })
         .setup(move |app| {
             builder.mount_events(app);
+
+            #[cfg(desktop)]
+            tray::create_tray(app).expect("Failed to initialize system tray");
 
             let app_handle = app.handle().clone();
             tauri::async_runtime::block_on(async move {
