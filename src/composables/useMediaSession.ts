@@ -20,12 +20,13 @@ export function useMediaSession(): void {
   const player = usePlayer();
   const media = (): HTMLMediaElement | null => state.activeMedia.value;
 
-  function setHandler(action: MediaSessionAction, handler: MediaSessionActionHandler): void {
+  function setHandler(
+    action: MediaSessionAction,
+    handler: MediaSessionActionHandler,
+  ): void {
     try {
       navigator.mediaSession.setActionHandler(action, handler);
-    } catch {
-      // Action not supported by this WebView: ignore it.
-    }
+    } catch {}
   }
 
   watch(
@@ -37,8 +38,6 @@ export function useMediaSession(): void {
         return;
       }
 
-      // Keep the previous metadata while a new track loads: publishing a
-      // "Loading …" placeholder made Windows show a stale entry.
       if (!video.title || video.title.startsWith("Loading ")) return;
 
       navigator.mediaSession.metadata = new MediaMetadata({
@@ -83,7 +82,9 @@ export function useMediaSession(): void {
   );
 
   setHandler("play", () => {
-    void media()?.play().catch(() => {});
+    void media()
+      ?.play()
+      .catch(() => {});
   });
   setHandler("pause", () => media()?.pause());
   setHandler("stop", () => media()?.pause());
@@ -93,7 +94,10 @@ export function useMediaSession(): void {
   setHandler("nexttrack", () => player.playNext());
   setHandler("seekbackward", (details) => {
     const element = media();
-    if (element) player.seek(Math.max(0, element.currentTime - (details.seekOffset ?? 10)));
+    if (element)
+      player.seek(
+        Math.max(0, element.currentTime - (details.seekOffset ?? 10)),
+      );
   });
   setHandler("seekforward", (details) => {
     const element = media();

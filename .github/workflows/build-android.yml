@@ -1,0 +1,73 @@
+name: Build Android
+
+on:
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      upload_artifact:
+        description: "Upload build artifact"
+        required: false
+        type: boolean
+        default: true
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: "zulu"
+          java-version: "17"
+
+      - name: Setup Android SDK & NDK
+        shell: bash
+        run: |
+          echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
+          if [ -d "$ANDROID_HOME/ndk" ]; then
+            NDK_PATH=$(find $ANDROID_HOME/ndk -maxdepth 1 -mindepth 1 | sort -V | tail -n 1)
+            echo "NDK_HOME=$NDK_PATH" >> $GITHUB_ENV
+            echo "ANDROID_NDK_ROOT=$NDK_PATH" >> $GITHUB_ENV
+            echo "Found Android NDK: $NDK_PATH"
+          fi
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
+
+      - name: Rust Cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+
+      - name: Install Frontend Dependencies
+        run: bun install --frozen-lockfile || bun install
+
+      - name: Initialize Android Target
+        shell: bash
+        run: |
+          if [ ! -d "src-tauri/gen/android" ]; then
+            bun run tauri android init --ci
+          fi
+
+      - name: Build Android APK
+        run: bun run tauri android build --apk --target aarch64 --ci
+
+      - name: Upload Android APK
+        if: ${{ inputs.upload_artifact != false }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: r-tube-android-apk
+          path: |
+            src-tauri/gen/android/app/build/outputs/apk/**/*.apk
+          if-no-files-found: warn
+

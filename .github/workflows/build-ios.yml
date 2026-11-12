@@ -1,0 +1,60 @@
+name: Build iOS
+
+on:
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      upload_artifact:
+        description: "Upload build artifact"
+        required: false
+        type: boolean
+        default: true
+
+jobs:
+  build-ios:
+    runs-on: macos-14
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios,aarch64-apple-ios-sim
+
+      - name: Rust Cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+
+      - name: Install Frontend Dependencies
+        run: bun install --frozen-lockfile || bun install
+
+      - name: Initialize iOS Target
+        shell: bash
+        run: |
+          if [ ! -d "src-tauri/gen/apple" ]; then
+            bun run tauri ios init --ci
+          fi
+
+      - name: Build iOS Application
+        shell: bash
+        run: |
+          # Build without requiring code signing certificate (outputs Xcode project and app bundle)
+          bun run tauri ios build --ci --no-bundling || bun run tauri ios build --ci
+
+      - name: Upload iOS Artifacts
+        if: ${{ inputs.upload_artifact != false }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: r-tube-ios
+          path: |
+            src-tauri/gen/apple/build/**/*.app
+            src-tauri/gen/apple/build/**/*.ipa
+          if-no-files-found: warn
+

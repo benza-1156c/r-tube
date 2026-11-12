@@ -1,0 +1,104 @@
+name: Release All Platforms
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: "Release Tag (e.g. v0.1.0)"
+        required: false
+        type: string
+        default: ""
+      draft:
+        description: "Create Draft Release"
+        required: false
+        type: boolean
+        default: false
+      prerelease:
+        description: "Create Pre-Release"
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  build-windows:
+    uses: ./.github/workflows/build-windows.yml
+    with:
+      upload_artifact: true
+    secrets: inherit
+
+  build-macos:
+    uses: ./.github/workflows/build-macos.yml
+    with:
+      upload_artifact: true
+    secrets: inherit
+
+  build-linux:
+    uses: ./.github/workflows/build-linux.yml
+    with:
+      upload_artifact: true
+    secrets: inherit
+
+  build-android:
+    uses: ./.github/workflows/build-android.yml
+    with:
+      upload_artifact: true
+    secrets: inherit
+
+  build-ios:
+    uses: ./.github/workflows/build-ios.yml
+    with:
+      upload_artifact: true
+    secrets: inherit
+
+  publish-release:
+    needs: [build-windows, build-macos, build-linux, build-android, build-ios]
+    if: always() && !cancelled() && !contains(needs.*.result, 'failure')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Determine Release Tag
+        id: vars
+        shell: bash
+        run: |
+          if [ -n "${{ github.ref_name }}" ] && [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            echo "tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          elif [ -n "${{ inputs.tag_name }}" ]; then
+            echo "tag=${{ inputs.tag_name }}" >> $GITHUB_OUTPUT
+          else
+            echo "tag=v0.1.0-$(date +'%Y%m%d%H%M%S')" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Display downloaded files
+        shell: bash
+        run: ls -la artifacts
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.vars.outputs.tag }}
+          name: Release ${{ steps.vars.outputs.tag }}
+          draft: ${{ inputs.draft || false }}
+          prerelease: ${{ inputs.prerelease || false }}
+          generate_release_notes: true
+          files: |
+            artifacts/*.msi
+            artifacts/*.exe
+            artifacts/*.dmg
+            artifacts/*.deb
+            artifacts/*.AppImage
+            artifacts/*.apk
+            artifacts/*.aab
+            artifacts/*.ipa
+            artifacts/*.tar.gz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
