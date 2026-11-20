@@ -43,7 +43,6 @@ async function toggleSubscription(): Promise<void> {
     const res = await commands.setSubscription(channelId.value, next);
     if (res.status === "ok") {
       subscribed.value = next;
-      subscribed.value = next;
     }
   } catch (err) {
     console.warn("Failed to update subscription:", err);

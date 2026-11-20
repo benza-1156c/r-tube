@@ -9,6 +9,7 @@
 export {}
 declare global {
   const EffectScope: typeof import('vue').EffectScope
+  const applyTheme: typeof import('../lib/theme').applyTheme
   const asyncComputed: typeof import('@vueuse/core').asyncComputed
   const autoResetRef: typeof import('@vueuse/core').autoResetRef
   const cn: typeof import('../lib/utils').cn
@@ -43,6 +44,7 @@ declare global {
   const getCurrentWatcher: typeof import('vue').getCurrentWatcher
   const getDeviceLanguages: typeof import('../lib/utils').getDeviceLanguages
   const getPrimaryDeviceLanguage: typeof import('../lib/utils').getPrimaryDeviceLanguage
+  const getTheme: typeof import('../lib/theme').getTheme
   const h: typeof import('vue').h
   const ignorableWatch: typeof import('@vueuse/core').ignorableWatch
   const inject: typeof import('vue').inject
@@ -97,6 +99,7 @@ declare global {
   const refThrottled: typeof import('@vueuse/core').refThrottled
   const refWithControl: typeof import('@vueuse/core').refWithControl
   const resolveComponent: typeof import('vue').resolveComponent
+  const setTheme: typeof import('../lib/theme').setTheme
   const shallowReactive: typeof import('vue').shallowReactive
   const shallowReadonly: typeof import('vue').shallowReadonly
   const shallowRef: typeof import('vue').shallowRef

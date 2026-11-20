@@ -27,12 +27,26 @@ impl YoutubeClient {
         }
     }
 
-    /// Fetch YouTube Subscriptions Feed
-    pub async fn get_subscriptions_feed(&self) -> Result<BrowseFeed, AppError> {
+    /// Fetch YouTube Subscriptions Feed, or one of its continuation pages.
+    pub async fn get_subscriptions_feed(
+        &self,
+        continuation: Option<&str>,
+    ) -> Result<BrowseFeed, AppError> {
         let yt = self.signed().await?;
-        yt.get_subscriptions_feed()
-            .await
-            .map_err(|e| AppError::Internal(format!("Failed to fetch subscriptions feed: {e}")))
+        match continuation {
+            Some(token) => {
+                innertube_rs::endpoints::feed::get_browse_continuation(&yt.session, token)
+                    .await
+                    .map_err(|e| {
+                        AppError::Internal(format!(
+                            "Failed to fetch subscriptions continuation: {e}"
+                        ))
+                    })
+            }
+            None => yt.get_subscriptions_feed().await.map_err(|e| {
+                AppError::Internal(format!("Failed to fetch subscriptions feed: {e}"))
+            }),
+        }
     }
 
     /// Watch history of the signed-in account, newest first.

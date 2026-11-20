@@ -22,14 +22,7 @@ export const commands = {
 	 *  own. The user is the only one who changes settings.
 	 */
 	updateSettings: (settings: AppSettings_Deserialize) => typedError<AppSettings_Serialize, AppError_Serialize>(__TAURI_INVOKE("update_settings", { settings })),
-	getHomeFeed: (continuation: string | null, params: string | null) => typedError<HomeFeed_Serialize, AppError_Serialize>(__TAURI_INVOKE("get_home_feed", { continuation, params })),
-	getSubscriptionsFeed: () => typedError<BrowseFeed_Serialize, AppError_Serialize>(__TAURI_INVOKE("get_subscriptions_feed")),
-	getTrending: () => typedError<TrendingFeed_Serialize, AppError_Serialize>(__TAURI_INVOKE("get_trending")),
-	search: (query: string, continuation: string | null, searchType: string | null, sort: string | null, uploadDate: string | null) => typedError<SearchResults_Serialize, AppError_Serialize>(__TAURI_INVOKE("search", { query, continuation, searchType, sort, uploadDate })),
-	getSearchSuggestions: (query: string) => typedError<SearchSuggestionItem_Serialize[], AppError_Serialize>(__TAURI_INVOKE("get_search_suggestions", { query })),
-	getPlaylist: (playlistId: string) => typedError<PlaylistDetailView_Serialize, AppError_Serialize>(__TAURI_INVOKE("get_playlist", { playlistId })),
-	getPlaylistContinuation: (continuation: string) => typedError<PlaylistContinuationResult_Serialize, AppError_Serialize>(__TAURI_INVOKE("get_playlist_continuation", { continuation })),
-	getVideoInfo: (videoId: string) => typedError<PlayerResponse_Serialize, AppError_Serialize>(__TAURI_INVOKE("get_video_info", { videoId })),
+	getAccountInfo: () => typedError<CurrentUserProfile_Serialize, AppError_Serialize>(__TAURI_INVOKE("get_account_info")),
 	/**
 	 *  Best audio-only stream for the lightweight listen player.
 	 * 
@@ -37,22 +30,29 @@ export const commands = {
 	 *  are re-minted on the Rust side.
 	 */
 	getAudioStream: (videoId: string) => typedError<AudioStreamInfo_Serialize, AppError_Serialize>(__TAURI_INVOKE("get_audio_stream", { videoId })),
+	/**  Channel header and its Videos tab. */
+	getChannelPage: (channelId: string) => typedError<ChannelPage_Serialize, AppError_Serialize>(__TAURI_INVOKE("get_channel_page", { channelId })),
+	/**  Subscribe to or unsubscribe from a channel. */
+	setSubscription: (channelId: string, subscribed: boolean) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("set_subscription", { channelId, subscribed })),
+	getHomeFeed: (continuation: string | null, params: string | null) => typedError<HomeFeed_Serialize, AppError_Serialize>(__TAURI_INVOKE("get_home_feed", { continuation, params })),
+	getSubscriptionsFeed: (continuation: string | null) => typedError<BrowseFeed_Serialize, AppError_Serialize>(__TAURI_INVOKE("get_subscriptions_feed", { continuation })),
+	getTrending: () => typedError<TrendingFeed_Serialize, AppError_Serialize>(__TAURI_INVOKE("get_trending")),
+	search: (query: string, continuation: string | null, searchType: string | null, sort: string | null, uploadDate: string | null) => typedError<SearchResults_Serialize, AppError_Serialize>(__TAURI_INVOKE("search", { query, continuation, searchType, sort, uploadDate })),
+	getSearchSuggestions: (query: string) => typedError<SearchSuggestionItem_Serialize[], AppError_Serialize>(__TAURI_INVOKE("get_search_suggestions", { query })),
+	/**  Watch history of the signed-in account. */
+	getHistory: () => typedError<VideoItem_Serialize[], AppError_Serialize>(__TAURI_INVOKE("get_history")),
+	getPlaylist: (playlistId: string) => typedError<PlaylistDetailView_Serialize, AppError_Serialize>(__TAURI_INVOKE("get_playlist", { playlistId })),
+	getPlaylistContinuation: (continuation: string) => typedError<PlaylistContinuationResult_Serialize, AppError_Serialize>(__TAURI_INVOKE("get_playlist_continuation", { continuation })),
+	getVideoInfo: (videoId: string) => typedError<PlayerResponse_Serialize, AppError_Serialize>(__TAURI_INVOKE("get_video_info", { videoId })),
 	getWatchNext: (videoId: string, playlistId: string | null, playlistIndex: number | null) => typedError<WatchNextResults_Serialize, AppError_Serialize>(__TAURI_INVOKE("get_watch_next", { videoId, playlistId, playlistIndex })),
-	getAccountInfo: () => typedError<CurrentUserProfile_Serialize, AppError_Serialize>(__TAURI_INVOKE("get_account_info")),
 	/**  Record the playback event that puts a video into the watch history. */
 	recordWatchStart: (videoId: string) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("record_watch_start", { videoId })),
 	/**  Report the playback position so the account remembers where it stopped. */
 	updateWatchTime: (videoId: string, seconds: number | null) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("update_watch_time", { videoId, seconds })),
-	/**  Watch history of the signed-in account. */
-	getHistory: () => typedError<VideoItem_Serialize[], AppError_Serialize>(__TAURI_INVOKE("get_history")),
 	/**  One page of comments for a video. */
 	getComments: (videoId: string, continuation: string | null) => typedError<CommentsPage_Serialize, AppError_Serialize>(__TAURI_INVOKE("get_comments", { videoId, continuation })),
-	/**  Channel header and its Videos tab. */
-	getChannelPage: (channelId: string) => typedError<ChannelPage_Serialize, AppError_Serialize>(__TAURI_INVOKE("get_channel_page", { channelId })),
 	/**  Like / dislike / clear a rating. */
 	rateVideo: (videoId: string, rating: VideoRating) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("rate_video", { videoId, rating })),
-	/**  Subscribe to or unsubscribe from a channel. */
-	setSubscription: (channelId: string, subscribed: boolean) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("set_subscription", { channelId, subscribed })),
 	getSubtitleContent: (url: string) => typedError<string, AppError_Serialize>(__TAURI_INVOKE("get_subtitle_content", { url })),
 };
 
@@ -555,6 +555,7 @@ export type VideoItem_Deserialize = {
 	thumbnailUrl: string,
 	duration: string,
 	channelName: string,
+	channelId?: string | null,
 	channelAvatarUrl: string,
 	isVerified: boolean,
 	isLive: boolean,
@@ -570,6 +571,7 @@ export type VideoItem_Serialize = {
 	thumbnailUrl: string,
 	duration: string,
 	channelName: string,
+	channelId: string | null,
 	channelAvatarUrl: string,
 	isVerified: boolean,
 	isLive: boolean,

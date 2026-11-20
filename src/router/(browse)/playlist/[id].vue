@@ -1,5 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import {
+  computed,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  watch,
+} from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { commands, type PlaylistDetailView_Deserialize } from "@/bindings";
 import { ListMusic, Loader2, Play } from "@lucide/vue";
@@ -16,6 +23,9 @@ const playlistId = computed(() =>
 );
 const playlist = ref<PlaylistDetailView_Deserialize | null>(null);
 const loading = ref(false);
+const isLoadingMore = ref(false);
+const bottomTarget = ref<HTMLElement | null>(null);
+let observer: IntersectionObserver | null = null;
 
 async function load(): Promise<void> {
   if (!playlistId.value) return;
@@ -43,8 +53,50 @@ function playAll(): void {
   if (playlist.value?.videos.length) playAt(0);
 }
 
-onMounted(load);
-watch(playlistId, load);
+async function loadMore(): Promise<void> {
+  const token = playlist.value?.continuationToken;
+  if (!token || isLoadingMore.value) return;
+
+  isLoadingMore.value = true;
+  try {
+    const res = await commands.getPlaylistContinuation(token);
+    if (res.status === "ok" && playlist.value) {
+      playlist.value.videos.push(...res.data.videos);
+      playlist.value.continuationToken = res.data.continuationToken ?? null;
+    }
+  } catch (err) {
+    console.warn("Failed to load more playlist videos:", err);
+  } finally {
+    isLoadingMore.value = false;
+  }
+}
+
+function observeBottom(): void {
+  observer?.disconnect();
+  observer = new IntersectionObserver(([entry]) => {
+    if (entry.isIntersecting && playlist.value?.continuationToken) {
+      void loadMore();
+    }
+  });
+  if (bottomTarget.value) observer.observe(bottomTarget.value);
+}
+
+onMounted(async () => {
+  await load();
+  await nextTick();
+  observeBottom();
+});
+
+onBeforeUnmount(() => {
+  observer?.disconnect();
+  observer = null;
+});
+
+watch(playlistId, async () => {
+  await load();
+  await nextTick();
+  observeBottom();
+});
 </script>
 
 <template>
@@ -163,6 +215,16 @@ watch(playlistId, load);
           </button>
         </li>
       </ul>
+
+      <div
+        ref="bottomTarget"
+        class="flex h-12 w-full items-center justify-center"
+      >
+        <Loader2
+          v-if="isLoadingMore"
+          class="h-5 w-5 animate-spin text-muted-foreground"
+        />
+      </div>
     </template>
 
     <div v-else class="flex flex-col items-center justify-center py-24">

@@ -28,9 +28,11 @@ let observer: IntersectionObserver | null = null;
 
 type SearchType = "all" | "video" | "playlist";
 type SearchSort = "relevance" | "popularity";
+type SearchUploadDate = "any" | "today" | "week" | "month" | "year";
 
 const searchType = ref<SearchType>("all");
 const sort = ref<SearchSort>("relevance");
+const uploadDate = ref<SearchUploadDate>("any");
 
 const typeOptions: { value: SearchType; label: string }[] = [
   { value: "all", label: "All" },
@@ -43,12 +45,24 @@ const sortOptions: { value: SearchSort; label: string }[] = [
   { value: "popularity", label: "Popular" },
 ];
 
+const uploadDateOptions: { value: SearchUploadDate; label: string }[] = [
+  { value: "any", label: "Any time" },
+  { value: "today", label: "Today" },
+  { value: "week", label: "This week" },
+  { value: "month", label: "This month" },
+  { value: "year", label: "This year" },
+];
+
 function searchTypeParam(): string | null {
   return searchType.value === "all" ? null : searchType.value;
 }
 
 function sortParam(): string | null {
   return sort.value === "relevance" ? null : sort.value;
+}
+
+function uploadDateParam(): string | null {
+  return uploadDate.value === "any" ? null : uploadDate.value;
 }
 
 async function loadInitialSearch() {
@@ -67,7 +81,7 @@ async function loadInitialSearch() {
       null,
       searchTypeParam(),
       sortParam(),
-      null,
+      uploadDateParam(),
     );
     if (res.status === "ok") {
       videos.value = res.data.videos ?? [];
@@ -98,7 +112,7 @@ async function loadMoreSearch() {
       continuation.value,
       searchTypeParam(),
       sortParam(),
-      null,
+      uploadDateParam(),
     );
     if (res.status === "ok") {
       if (res.data.videos && res.data.videos.length > 0) {
@@ -148,7 +162,7 @@ watch(query, (newQ, oldQ) => {
   }
 });
 
-watch([searchType, sort], () => {
+watch([searchType, sort, uploadDate], () => {
   loadInitialSearch();
 });
 </script>
@@ -192,6 +206,29 @@ watch([searchType, sort], () => {
             : 'border-border text-muted-foreground hover:bg-muted'
         "
         @click="sort = option.value"
+      >
+        {{ option.label }}
+      </button>
+    </div>
+
+    <!-- Upload date -->
+    <div v-if="query" class="flex flex-wrap items-center gap-2 px-6 pb-3">
+      <span
+        class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground"
+      >
+        Upload date
+      </span>
+      <button
+        v-for="option in uploadDateOptions"
+        :key="option.value"
+        type="button"
+        class="rounded-full border px-3 py-1 text-xs font-medium transition-colors cursor-pointer"
+        :class="
+          uploadDate === option.value
+            ? 'border-foreground bg-foreground text-background'
+            : 'border-border text-muted-foreground hover:bg-muted'
+        "
+        @click="uploadDate = option.value"
       >
         {{ option.label }}
       </button>

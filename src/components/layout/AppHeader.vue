@@ -6,6 +6,7 @@ import { commands, type Model } from "@/bindings";
 import { useSidebar } from "@/lib/components/ui/sidebar";
 import HeaderSearch from "@/components/layout/HeaderSearch.vue";
 import { useIsMobileDevice } from "@/composables/useIsMobileDevice";
+import { getTheme, setTheme } from "@/lib/theme";
 
 defineProps<{
   hideSidebar?: boolean;
@@ -15,13 +16,11 @@ const router = useRouter();
 const { toggleSidebar } = useSidebar();
 const isMobile = useIsMobileDevice();
 
-const isDark = ref(true);
+const isDark = ref(getTheme() === "dark");
 const activeProfile = ref<Model | null>(null);
 const isLoggingIn = ref(false);
 
 onMounted(async () => {
-  document.documentElement.classList.add("dark");
-
   try {
     const res = await commands.getActiveProfile();
     if (res.status === "ok" && res.data) {
@@ -34,11 +33,7 @@ onMounted(async () => {
 
 function toggleTheme() {
   isDark.value = !isDark.value;
-  if (isDark.value) {
-    document.documentElement.classList.add("dark");
-  } else {
-    document.documentElement.classList.remove("dark");
-  }
+  setTheme(isDark.value ? "dark" : "light");
 }
 
 async function handleLogin() {

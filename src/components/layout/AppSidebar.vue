@@ -38,6 +38,7 @@ const libraryItems = [
 
 interface ChannelItem {
   name: string;
+  channelId: string | null;
   avatarUrl: string;
   isLive: boolean;
   path: string;
@@ -54,16 +55,20 @@ async function loadRealSubscriptions() {
     isSignedIn.value = Boolean(profileRes.status === "ok" && profileRes.data);
 
     if (isSignedIn.value) {
-      const feedRes = await commands.getSubscriptionsFeed();
+      const feedRes = await commands.getSubscriptionsFeed(null);
       if (feedRes.status === "ok" && feedRes.data?.videos) {
         const map = new Map<string, ChannelItem>();
         for (const v of feedRes.data.videos) {
-          if (v.channelName && !map.has(v.channelName)) {
-            map.set(v.channelName, {
+          const key = v.channelId || v.channelName;
+          if (v.channelName && !map.has(key)) {
+            map.set(key, {
               name: v.channelName,
+              channelId: v.channelId ?? null,
               avatarUrl: v.channelAvatarUrl || "",
               isLive: Boolean(v.isLive),
-              path: "/subscriptions",
+              path: v.channelId
+                ? `/channel/${v.channelId}`
+                : "/subscriptions",
             });
           }
         }

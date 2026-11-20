@@ -45,6 +45,7 @@ impl From<innertube_rs::WatchNextResults> for WatchNextResults {
                         r.duration_text.unwrap_or_default()
                     },
                     channel_name: r.author,
+                    channel_id: r.author_id,
                     channel_avatar_url: r.author_avatar.unwrap_or_default(),
                     is_verified: false,
                     is_live: r.is_live,

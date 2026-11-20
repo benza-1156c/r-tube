@@ -55,6 +55,8 @@ pub fn run() {
                     .app_data_dir()
                     .expect("Failed to get app_data_dir");
 
+                println!("{:#?}",app_path);
+
                 let db = db::init_db(&app_path)
                     .await
                     .expect("Failed to initialize database");

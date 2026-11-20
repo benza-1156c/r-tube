@@ -48,6 +48,7 @@ impl From<innertube_rs::SearchResults> for SearchResults {
                         thumbnail_url: thumb,
                         duration: v.duration.unwrap_or_default(),
                         channel_name: v.author,
+                        channel_id: Some(v.channel_id),
                         channel_avatar_url: String::new(),
                         is_verified: false,
                         is_live: false,

@@ -9,6 +9,8 @@ pub struct VideoItem {
     pub thumbnail_url: String,
     pub duration: String,
     pub channel_name: String,
+    #[serde(default)]
+    pub channel_id: Option<String>,
     pub channel_avatar_url: String,
     pub is_verified: bool,
     pub is_live: bool,
@@ -137,6 +139,7 @@ impl From<&innertube_rs::VideoNode> for VideoItem {
                 v.duration.clone().unwrap_or_default()
             },
             channel_name,
+            channel_id: v.author.as_ref().and_then(|a| a.id.clone()),
             channel_avatar_url,
             is_verified,
             is_live: v.is_live,
