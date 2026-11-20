@@ -14,6 +14,12 @@ pub async fn login_yt(app: AppHandle) -> Result<profile::Model, AppError> {
 }
 
 #[app_command]
+pub async fn cancel_login(app: AppHandle) -> Result<(), AppError> {
+    auth_service::cancel_login(&app);
+    Ok(())
+}
+
+#[app_command]
 pub async fn logout(app: AppHandle) -> Result<(), AppError> {
     let state = app.state::<AppState>();
     profile_service::logout(&state.db).await

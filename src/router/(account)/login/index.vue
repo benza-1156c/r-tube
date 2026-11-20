@@ -6,11 +6,16 @@ const router = useRouter();
 const profiles = ref<Model[]>([]);
 const isLoggingIn = ref(false);
 const isSwitchingId = ref<number | null>(null);
+const errorMessage = ref<string | null>(null);
 
 async function get_profiles() {
   const p = await commands.getAllProfiles();
   if (p.status === "ok") {
-    profiles.value = p.data;
+    // Older builds stored a placeholder when the account lookup failed.
+    // Keep it out of the picker; signing in again repairs/reuses it.
+    profiles.value = p.data.filter(
+      (prof) => !(prof.name === "YouTube User" && !prof.email),
+    );
   }
 }
 
@@ -31,17 +36,28 @@ async function selectProfile(id: number) {
 async function handleLogin() {
   if (isLoggingIn.value) return;
   isLoggingIn.value = true;
+  errorMessage.value = null;
   try {
     const res = await commands.loginYt();
     if (res.status === "ok") {
       await get_profiles();
       router.push("/");
+    } else {
+      const message = res.error.message || "Sign in failed";
+      errorMessage.value = /cancelled/i.test(message) ? null : message;
     }
   } catch (err) {
+    errorMessage.value = err instanceof Error ? err.message : "Sign in failed";
     console.error("Login failed:", err);
   } finally {
     isLoggingIn.value = false;
   }
+}
+
+async function cancelLogin() {
+  try {
+    await commands.cancelLogin();
+  } catch {}
 }
 
 onMounted(() => {
@@ -129,6 +145,27 @@ definePage({
                 : "Sign in with YouTube"
           }}</span>
         </Button>
+
+        <p
+          v-if="isLoggingIn"
+          class="text-center text-xs text-muted-foreground leading-relaxed"
+        >
+          Complete the sign-in in the YouTube window. If it shows the YouTube
+          home page, click "Sign in" there first.
+        </p>
+
+        <Button
+          v-if="isLoggingIn"
+          variant="ghost"
+          class="w-full"
+          @click="cancelLogin"
+        >
+          Cancel sign in
+        </Button>
+
+        <p v-if="errorMessage" class="text-xs text-red-500 leading-relaxed">
+          {{ errorMessage }}
+        </p>
       </CardContent>
 
       <CardFooter>

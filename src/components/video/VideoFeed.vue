@@ -15,38 +15,45 @@ const isLoading = ref(false);
 const continuation = ref<string | null>(null);
 const items = ref<FeedItem[]>([]);
 const bottomTarget = ref<HTMLElement | null>(null);
+const errorMessage = ref<string | null>(null);
 
 async function get_homefeed() {
   if (isLoading.value) return;
   try {
     isLoading.value = true;
+    errorMessage.value = null;
     const res = await commands.getHomeFeed(
       continuation.value,
       props.categoryParams,
     );
-    if (res.status === "ok") {
-      const batchItems: FeedItem[] = [];
+    if (res.status !== "ok") {
+      errorMessage.value = res.error.message || "Failed to load the home feed";
+      return;
+    }
 
-      if (res.data.playlists && res.data.playlists.length > 0) {
-        for (const p of res.data.playlists) {
-          batchItems.push({ kind: "playlist", data: p });
-        }
-      }
+    const batchItems: FeedItem[] = [];
 
-      if (res.data.videos && res.data.videos.length > 0) {
-        for (const v of res.data.videos) {
-          batchItems.push({ kind: "video", data: v });
-        }
-      }
-
-      items.value.push(...batchItems);
-      continuation.value = res.data.continuationToken ?? null;
-
-      if (res.data.filterChips && res.data.filterChips.length > 0) {
-        emit("update-chips", res.data.filterChips);
+    if (res.data.playlists && res.data.playlists.length > 0) {
+      for (const p of res.data.playlists) {
+        batchItems.push({ kind: "playlist", data: p });
       }
     }
-  } catch (_) {
+
+    if (res.data.videos && res.data.videos.length > 0) {
+      for (const v of res.data.videos) {
+        batchItems.push({ kind: "video", data: v });
+      }
+    }
+
+    items.value.push(...batchItems);
+    continuation.value = res.data.continuationToken ?? null;
+
+    if (res.data.filterChips && res.data.filterChips.length > 0) {
+      emit("update-chips", res.data.filterChips);
+    }
+  } catch (err) {
+    errorMessage.value =
+      err instanceof Error ? err.message : "Failed to load the home feed";
   } finally {
     isLoading.value = false;
   }
@@ -67,7 +74,17 @@ onMounted(() => {
 
 <template>
   <div class="flex-1 flex flex-col">
-    <VideoGrid :items="items" :loading="isLoading" />
+    <div
+      v-if="errorMessage && items.length === 0"
+      class="mx-6 mt-4 flex flex-col items-center gap-3 rounded-xl border border-border p-10 text-center"
+    >
+      <p class="text-sm text-muted-foreground">{{ errorMessage }}</p>
+      <Button variant="secondary" size="sm" @click="get_homefeed">
+        Try again
+      </Button>
+    </div>
+
+    <VideoGrid v-else :items="items" :loading="isLoading" />
     <div ref="bottomTarget" class="h-10 w-full"></div>
   </div>
 </template>

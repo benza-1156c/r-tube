@@ -44,6 +44,17 @@ pub async fn upsert_profile(
         .one(db)
         .await?;
 
+    // Older builds saved a placeholder profile when the account lookup failed.
+    // Reuse it for the first real sign-in instead of leaving a broken entry.
+    let existing = match existing {
+        Some(profile) => Some(profile),
+        None => profile::Entity::find()
+            .filter(profile::Column::Name.eq("YouTube User"))
+            .filter(profile::Column::Email.eq(""))
+            .one(db)
+            .await?,
+    };
+
     let now = Utc::now();
 
     if let Some(existing) = existing {

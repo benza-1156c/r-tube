@@ -217,7 +217,12 @@ impl YoutubeClient {
         let final_name = name
             .or_else(|| email.clone())
             .or_else(|| handle.clone())
-            .unwrap_or_else(|| "YouTube User".to_string());
+            .ok_or_else(|| {
+                AppError::NotFound(
+                    "Could not read the signed-in YouTube account. Please sign in again."
+                        .to_string(),
+                )
+            })?;
 
         Ok(CurrentUserProfile {
             name: final_name,
