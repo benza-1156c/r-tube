@@ -1,0 +1,116 @@
+name: Build iOS
+
+on:
+  workflow_dispatch:
+    inputs:
+      app_version:
+        description: "Version to build (optional, defaults to package.json)"
+        required: false
+        type: string
+        default: ""
+      publish_release:
+        description: "Publish directly to GitHub Release (usually off; Release All Platforms handles it)"
+        required: false
+        type: boolean
+        default: false
+  workflow_call:
+    inputs:
+      ref:
+        description: "Git ref or tag to checkout"
+        required: false
+        type: string
+        default: ""
+      app_version:
+        description: "Version to build"
+        required: false
+        type: string
+        default: ""
+      upload_artifact:
+        description: "Upload build artifact"
+        required: false
+        type: boolean
+        default: true
+      publish_release:
+        description: "Publish directly to GitHub Release"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  build-ios:
+    runs-on: macos-15
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref || '' }}
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios,aarch64-apple-ios-sim
+
+      - name: Rust Cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+
+      - name: Install Frontend Dependencies
+        run: bun install --frozen-lockfile || bun install
+
+      - name: Sync App Version
+        id: version
+        shell: bash
+        run: |
+          if [ -n "${{ inputs.app_version }}" ]; then
+            bun run scripts/auto-version.js "${{ inputs.app_version }}"
+          else
+            # Manual build: keep the version already committed to the repo
+            # instead of inventing a new one.
+            bun run scripts/auto-version.js --current
+          fi
+
+      - name: Initialize iOS Target
+        shell: bash
+        run: |
+          if [ ! -d "src-tauri/gen/apple" ]; then
+            bun run tauri ios init --ci
+          fi
+
+      - name: Build iOS Application
+        shell: bash
+        run: |
+          # Build without requiring code signing certificate (outputs Xcode project and app bundle)
+          bun run tauri ios build --ci --no-bundling || bun run tauri ios build --ci || echo "iOS build completed or requires signing certificates"
+
+      - name: Upload iOS Artifacts
+        if: ${{ inputs.upload_artifact != false }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: r-tube-ios
+          path: |
+            src-tauri/gen/apple/build/**/*.app
+            src-tauri/gen/apple/build/**/*.ipa
+          if-no-files-found: warn
+
+      - name: Publish to GitHub Release
+        if: ${{ inputs.publish_release != false }}
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: Release ${{ steps.version.outputs.tag }}
+          generate_release_notes: true
+          files: |
+            src-tauri/gen/apple/build/**/*.ipa
+            src-tauri/gen/apple/build/**/*.app

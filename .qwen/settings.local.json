@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls -lt /media/benza/G/Downloads/*.json 2>/dev/null | head -20; echo \"--- opencode storage ---\"; ls -d ~/.local/share/opencode ~/.config/opencode 2>/dev/null; find ~/.local/share/opencode -maxdepth 3 -type d 2>/dev/null | head -30)"
+    ]
+  }
+}

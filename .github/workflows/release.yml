@@ -1,0 +1,304 @@
+name: Release All Platforms
+
+# Releases are manual on purpose. Commits never ship on their own — run this
+# workflow from the Actions tab once you are ready.
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Version bump (auto reads Conventional Commits since the last tag)"
+        required: true
+        default: "auto"
+        type: choice
+        options:
+          - "auto"
+          - "patch"
+          - "minor"
+          - "major"
+      version:
+        description: "Exact version optional. Overrides bump."
+        required: false
+        type: string
+        default: ""
+      prerelease:
+        description: "Mark the GitHub release as a pre-release"
+        required: false
+        type: boolean
+        default: false
+      build_windows:
+        description: "Build Windows"
+        required: false
+        type: boolean
+        default: true
+      build_macos:
+        description: "Build macOS"
+        required: false
+        type: boolean
+        default: false
+      build_linux:
+        description: "Build Linux"
+        required: false
+        type: boolean
+        default: true
+      build_android:
+        description: "Build Android"
+        required: false
+        type: boolean
+        default: true
+      build_ios:
+        description: "Build iOS"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+# One release at a time, so two manual runs cannot race for the same tag.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  prepare-version:
+    name: Prepare Version & Tag
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      skip: ${{ steps.version.outputs.skip }}
+      tag: ${{ steps.version.outputs.tag }}
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Determine next version
+        id: version
+        shell: bash
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            echo "Exact version requested: ${{ inputs.version }}"
+            bun run scripts/auto-version.js "${{ inputs.version }}"
+          else
+            echo "Bump strategy: ${{ inputs.bump }}"
+            bun run scripts/auto-version.js --bump "${{ inputs.bump }}"
+          fi
+
+      - name: Nothing to release
+        if: steps.version.outputs.skip == 'true'
+        shell: bash
+        run: |
+          echo "::notice::No release-worthy commits since the last tag. Nothing to do."
+          {
+            echo "### No release created"
+            echo ""
+            echo "There were no \`feat\`, \`fix\`, \`perf\`, \`refactor\` or breaking"
+            echo "commits since the last tag (only chore/docs/etc.)."
+            echo ""
+            echo "Use **Run workflow → bump: patch** to force a release."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Commit version bump
+        if: steps.version.outputs.skip != 'true'
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          if ! git diff --quiet -- \
+            package.json \
+            src-tauri/tauri.conf.json \
+            src-tauri/Cargo.toml \
+            src-tauri/Cargo.lock; then
+            git add \
+              package.json \
+              src-tauri/tauri.conf.json \
+              src-tauri/Cargo.toml \
+              src-tauri/Cargo.lock
+            git commit -m "chore(release): ${{ steps.version.outputs.tag }} [skip ci]"
+            git push origin HEAD
+          else
+            echo "Version files already in sync; no commit needed."
+          fi
+
+      - name: Create and push tag
+        if: steps.version.outputs.skip != 'true'
+        shell: bash
+        run: |
+          TAG="${{ steps.version.outputs.tag }}"
+
+          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            echo "::error::Tag $TAG already exists. Choose another version."
+            exit 1
+          fi
+
+          git tag "$TAG"
+          git push origin "$TAG"
+          echo "Created tag $TAG"
+
+  build-windows:
+    name: Build Windows
+    needs: prepare-version
+    if: needs.prepare-version.result == 'success' && needs.prepare-version.outputs.skip != 'true' && inputs.build_windows
+    uses: ./.github/workflows/build-windows.yml
+    with:
+      ref: ${{ needs.prepare-version.outputs.tag }}
+      app_version: ${{ needs.prepare-version.outputs.version }}
+      upload_artifact: true
+      publish_release: false
+    secrets: inherit
+
+  build-macos:
+    name: Build macOS
+    needs: prepare-version
+    if: needs.prepare-version.result == 'success' && needs.prepare-version.outputs.skip != 'true' && inputs.build_macos
+    uses: ./.github/workflows/build-macos.yml
+    with:
+      ref: ${{ needs.prepare-version.outputs.tag }}
+      app_version: ${{ needs.prepare-version.outputs.version }}
+      upload_artifact: true
+      publish_release: false
+    secrets: inherit
+
+  build-linux:
+    name: Build Linux
+    needs: prepare-version
+    if: needs.prepare-version.result == 'success' && needs.prepare-version.outputs.skip != 'true' && inputs.build_linux
+    uses: ./.github/workflows/build-linux.yml
+    with:
+      ref: ${{ needs.prepare-version.outputs.tag }}
+      app_version: ${{ needs.prepare-version.outputs.version }}
+      upload_artifact: true
+      publish_release: false
+    secrets: inherit
+
+  build-android:
+    name: Build Android
+    needs: prepare-version
+    if: needs.prepare-version.result == 'success' && needs.prepare-version.outputs.skip != 'true' && inputs.build_android
+    uses: ./.github/workflows/build-android.yml
+    with:
+      ref: ${{ needs.prepare-version.outputs.tag }}
+      app_version: ${{ needs.prepare-version.outputs.version }}
+      upload_artifact: true
+      publish_release: false
+    secrets: inherit
+
+  build-ios:
+    name: Build iOS
+    needs: prepare-version
+    if: needs.prepare-version.result == 'success' && needs.prepare-version.outputs.skip != 'true' && inputs.build_ios
+    uses: ./.github/workflows/build-ios.yml
+    with:
+      ref: ${{ needs.prepare-version.outputs.tag }}
+      app_version: ${{ needs.prepare-version.outputs.version }}
+      upload_artifact: true
+      publish_release: false
+    secrets: inherit
+
+  publish-release:
+    name: Publish Release
+    needs:
+      - prepare-version
+      - build-windows
+      - build-macos
+      - build-linux
+      - build-android
+      - build-ios
+    if: |
+      always() &&
+      !cancelled() &&
+      needs.prepare-version.result == 'success' &&
+      needs.prepare-version.outputs.skip != 'true' &&
+      !contains(needs.*.result, 'failure') &&
+      !contains(needs.*.result, 'cancelled') &&
+      (needs.build-windows.result == 'success' ||
+       needs.build-macos.result == 'success' ||
+       needs.build-linux.result == 'success' ||
+       needs.build-android.result == 'success' ||
+       needs.build-ios.result == 'success')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v7
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Display downloaded files
+        shell: bash
+        run: find artifacts -type f | sort
+
+      # upload-artifact keeps the directory layout relative to the glob's
+      # non-magic prefix, so the downloaded tree looks like
+      # `artifacts/msi/*.msi`, `artifacts/deb/*.deb`,
+      # `artifacts/aarch64-apple-darwin/release/bundle/dmg/*.dmg`, ... .
+      # Flatten every installer into one directory so the release step can
+      # attach them with a simple `release-assets/*` glob.
+      - name: Collect release files
+        shell: bash
+        run: |
+          mkdir -p release-assets
+          shopt -s globstar nullglob
+          for f in artifacts/**/*.{msi,exe,dmg,deb,AppImage,apk,aab,ipa,tar.gz}; do
+            if [ -f "$f" ]; then
+              cp -v "$f" release-assets/
+            fi
+          done
+
+          count=$(find release-assets -maxdepth 1 -type f | wc -l)
+          echo "Collected $count release asset(s)"
+          ls -la release-assets
+
+          if [ "$count" -eq 0 ]; then
+            echo "::error::No installer files were found in the downloaded artifacts"
+            exit 1
+          fi
+
+      - name: Create GitHub Release
+        id: release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ needs.prepare-version.outputs.tag }}
+          name: Release ${{ needs.prepare-version.outputs.tag }}
+          prerelease: ${{ inputs.prerelease || false }}
+          make_latest: ${{ (inputs.prerelease || false) && 'false' || 'true' }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: release-assets/*
+
+      # Always print exactly where the release and its assets went.
+      - name: Release summary
+        shell: bash
+        run: |
+          assets=$(find release-assets -maxdepth 1 -type f | wc -l)
+          {
+            echo "### Release ${{ needs.prepare-version.outputs.tag }}"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Version | \`${{ needs.prepare-version.outputs.version }}\` |"
+            echo "| Assets uploaded | ${assets} |"
+            echo "| Release page | ${{ steps.release.outputs.url }} |"
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          {
+            echo ""
+            echo "<details><summary>Attached files</summary>"
+            echo ""
+            echo '```'
+            ls -1 release-assets
+            echo '```'
+            echo "</details>"
+          } >> "$GITHUB_STEP_SUMMARY"
