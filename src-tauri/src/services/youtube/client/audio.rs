@@ -113,8 +113,10 @@ impl YoutubeClient {
                 None => self.playback_info(video_id).await.ok(),
             };
             if let Some(info) = info {
-                let signed = self.signed().await?;
-                match audio_from_response(&signed, info.player_response, language, None) {
+                // The playback response came from the anonymous VISIONOS
+                // session, so resolve its URLs with that same session.
+                let anon = self.anon().await?;
+                match audio_from_response(&anon, info.player_response, language, None) {
                     Ok(picked) if picked.format.itag == 251 => return Ok(picked),
                     Ok(picked) => fallback = Some(picked),
                     Err(e) => eprintln!("[YouTube] playback audio unusable: {e}"),

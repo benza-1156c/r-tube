@@ -36,13 +36,12 @@ impl YoutubeClient {
 
     /// Fresh player session data from the client that carries an HLS manifest.
     ///
-    /// The library's `/player` call defaults to the web client, which returns
-    /// no `hlsManifestUrl` for regular videos (its fallback chain only runs
-    /// when the web response is unplayable). VISIONOS is the client that
-    /// serves HLS and it also carries the Opus audio track, captions and the
-    /// playback tracking used for history.
+    /// Playback uses the anonymous client: VISIONOS rejects an authenticated
+    /// cookie session with a 400, while the same request anonymously returns
+    /// the HLS manifest, Opus audio, captions and playback tracking. History
+    /// and feed commands still use the signed client separately.
     async fn fetch_playback_info(&self, video_id: &str) -> Result<VideoInfo, AppError> {
-        let yt = self.signed().await?;
+        let yt = self.anon().await?;
         yt.get_basic_info(video_id, Some(&options_for_client("VISIONOS")))
             .await
             .map_err(|e| AppError::Internal(format!("Failed to get video info: {e}")))
