@@ -11,10 +11,6 @@ const props = defineProps<{
 const router = useRouter();
 const { settings } = useSettings();
 
-function openPlaylist() {
-  router.push(`/playlist/${props.playlist.id}`);
-}
-
 function playAll(e: MouseEvent) {
   e.stopPropagation();
   const videoId =
@@ -34,7 +30,6 @@ function playAll(e: MouseEvent) {
 <template>
   <div
     class="group flex flex-col gap-3 cursor-pointer select-none"
-    @click="openPlaylist"
   >
     <!-- Thumbnail Container -->
     <div

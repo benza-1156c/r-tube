@@ -51,6 +51,20 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/(player)/listen/[id]': RouteRecordInfo<
+      '/(player)/listen/[id]',
+      '/listen/:id',
+      { id: ParamValue<true> },
+      { id: ParamValue<false> },
+      | never
+    >,
+    '/(player)/watch/[id]': RouteRecordInfo<
+      '/(player)/watch/[id]',
+      '/watch/:id',
+      { id: ParamValue<true> },
+      { id: ParamValue<false> },
+      | never
+    >,
     '/(browse)/channel/[id]': RouteRecordInfo<
       '/(browse)/channel/[id]',
       '/channel/:id',
@@ -93,20 +107,6 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
-    '/(player)/listen/[id]': RouteRecordInfo<
-      '/(player)/listen/[id]',
-      '/listen/:id',
-      { id: ParamValue<true> },
-      { id: ParamValue<false> },
-      | never
-    >,
-    '/(player)/watch/[id]': RouteRecordInfo<
-      '/(player)/watch/[id]',
-      '/watch/:id',
-      { id: ParamValue<true> },
-      { id: ParamValue<false> },
-      | never
-    >,
   }
 
   /**
@@ -144,6 +144,18 @@ declare module 'vue-router/auto-routes' {
       views:
         | never
     }
+    'src/router/(player)/listen/[id].vue': {
+      routes:
+        | '/(player)/listen/[id]'
+      views:
+        | never
+    }
+    'src/router/(player)/watch/[id].vue': {
+      routes:
+        | '/(player)/watch/[id]'
+      views:
+        | never
+    }
     'src/router/(browse)/channel/[id].vue': {
       routes:
         | '/(browse)/channel/[id]'
@@ -177,18 +189,6 @@ declare module 'vue-router/auto-routes' {
     'src/router/(browse)/trending/index.vue': {
       routes:
         | '/(browse)/trending/'
-      views:
-        | never
-    }
-    'src/router/(player)/listen/[id].vue': {
-      routes:
-        | '/(player)/listen/[id]'
-      views:
-        | never
-    }
-    'src/router/(player)/watch/[id].vue': {
-      routes:
-        | '/(player)/watch/[id]'
       views:
         | never
     }
